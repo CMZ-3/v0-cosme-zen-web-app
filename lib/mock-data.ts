@@ -1,4 +1,4 @@
-import type { ProductListItem, ProductKPISummary, Product, ProductLot, AuditEntry } from "./product-types"
+import type { ProductListItem, ProductKPISummary, Product, ProductLot, AuditEntry, ProductSpecification, ProductAttribute, LotMovement, LotMovementSummary } from "./product-types"
 
 export const mockKPI: ProductKPISummary = {
   total: 248,
@@ -253,7 +253,8 @@ export const mockLots: ProductLot[] = [
   {
     id: "lot-1",
     productId: "1",
-    lotNumber: "LOT-260201",
+    lotNumber: "PLT-260201-001",
+    fdaLotReference: "FDA-LOT-VC15-260201",
     jobOrderId: "jo-101",
     jobOrderNumber: "JO-2026-0101",
     mfgDate: "2026-02-01",
@@ -263,6 +264,9 @@ export const mockLots: ProductLot[] = [
     yieldPercent: 98.2,
     qcResult: "pass",
     qcData: { appearance: "Clear yellow liquid", odor: "Normal citrus", phValue: 5.8, viscosity: 420, specificGravity: 1.02, microTest: "< 100 CFU/g" },
+    qualityStatus: "approved",
+    storageLocation: "Warehouse A-1",
+    reservedQuantity: 500,
     inStockQty: 8500,
     deliveredQty: 1500,
     costPerUnit: 21.63,
@@ -278,7 +282,8 @@ export const mockLots: ProductLot[] = [
   {
     id: "lot-2",
     productId: "1",
-    lotNumber: "LOT-260115",
+    lotNumber: "PLT-260115-001",
+    fdaLotReference: "FDA-LOT-VC15-260115",
     jobOrderId: "jo-095",
     jobOrderNumber: "JO-2026-0095",
     mfgDate: "2026-01-15",
@@ -288,6 +293,9 @@ export const mockLots: ProductLot[] = [
     yieldPercent: 97.5,
     qcResult: "pass",
     qcData: { appearance: "Clear yellow liquid", odor: "Normal", phValue: 5.6, viscosity: 410, specificGravity: 1.01, microTest: "< 100 CFU/g" },
+    qualityStatus: "approved",
+    storageLocation: "Warehouse A-2",
+    reservedQuantity: 0,
     inStockQty: 4000,
     deliveredQty: 11000,
     costPerUnit: 21.63,
@@ -303,7 +311,8 @@ export const mockLots: ProductLot[] = [
   {
     id: "lot-3",
     productId: "1",
-    lotNumber: "LOT-251201",
+    lotNumber: "PLT-251201-001",
+    fdaLotReference: "FDA-LOT-VC15-251201",
     jobOrderId: "jo-082",
     jobOrderNumber: "JO-2025-0082",
     mfgDate: "2025-12-01",
@@ -312,6 +321,8 @@ export const mockLots: ProductLot[] = [
     yieldPercent: 96.8,
     qcResult: "pass",
     qcData: { appearance: "Clear yellow liquid", odor: "Normal", phValue: 6.0, viscosity: 430 },
+    qualityStatus: "approved",
+    reservedQuantity: 0,
     inStockQty: 0,
     deliveredQty: 10000,
     costPerUnit: 22.10,
@@ -323,13 +334,16 @@ export const mockLots: ProductLot[] = [
   {
     id: "lot-4",
     productId: "1",
-    lotNumber: "LOT-251101",
+    lotNumber: "PLT-251101-001",
+    fdaLotReference: "FDA-LOT-VC15-251101",
     mfgDate: "2025-11-01",
     expDate: "2027-11-01",
     quantity: 5000,
     yieldPercent: 94.2,
     qcResult: "fail",
     qcData: { appearance: "Slightly cloudy", odor: "Off-odor detected", phValue: 4.8, viscosity: 250 },
+    qualityStatus: "rejected",
+    reservedQuantity: 0,
     inStockQty: 0,
     deliveredQty: 0,
     costPerUnit: 21.63,
@@ -342,12 +356,15 @@ export const mockLots: ProductLot[] = [
   {
     id: "lot-5",
     productId: "1",
-    lotNumber: "LOT-260228",
+    lotNumber: "PLT-260228-001",
+    fdaLotReference: "FDA-LOT-VC15-260228",
     mfgDate: "2026-02-28",
     expDate: "2028-02-28",
     quantity: 8000,
     qcResult: "pending",
     qcData: {},
+    qualityStatus: "pending",
+    reservedQuantity: 0,
     inStockQty: 0,
     deliveredQty: 0,
     costPerUnit: 21.63,
@@ -369,3 +386,38 @@ export const mockAudit: AuditEntry[] = [
   { id: "a-7", action: "lot_created", description: "Lot LOT-260201 created (10,000 units)", userName: "Admin", timestamp: "2026-02-01 08:00", color: "orange" },
   { id: "a-8", action: "updated", description: "QC Spec updated - appearance standard", userName: "Admin", timestamp: "2026-02-15 16:45", color: "blue" },
 ]
+
+export const mockSpecifications: ProductSpecification[] = [
+  { id: "spec-1", productId: "1", specType: "general", title: "Product Description", content: "Concentrated serum with 15% Vitamin C (L-Ascorbic Acid) for brightening and anti-oxidant protection. Suitable for all skin types.", sortOrder: 1, createdAt: "2025-06-15", updatedAt: "2025-06-15" },
+  { id: "spec-2", productId: "1", specType: "regulatory", title: "FDA Registration Requirements", content: "Registered under cosmetic category. Requires batch-level COA for each production lot. Annual renewal required.", sortOrder: 2, createdAt: "2025-06-15", updatedAt: "2025-06-15" },
+  { id: "spec-3", productId: "1", specType: "stability", title: "Stability Testing", content: "6-month accelerated stability (45C/75%RH) passed. Real-time stability ongoing at 25C/60%RH, 30C/65%RH.", sortOrder: 3, createdAt: "2025-08-10", updatedAt: "2025-08-10" },
+  { id: "spec-4", productId: "1", specType: "micro", title: "Microbiological Limits", content: "TPC < 100 CFU/g, Yeast & Mold < 10 CFU/g, E.coli: Absent, S.aureus: Absent, P.aeruginosa: Absent", sortOrder: 4, createdAt: "2025-06-15", updatedAt: "2025-06-15" },
+  { id: "spec-5", productId: "1", specType: "packaging", title: "Packaging Specification", content: "30ml frosted glass dropper bottle with gold dropper pump, 18mm neck. Individual white art paper box with UV spot coating.", sortOrder: 5, createdAt: "2025-07-01", updatedAt: "2025-07-01" },
+]
+
+export const mockAttributes: ProductAttribute[] = [
+  { id: "attr-1", productId: "1", scope: "product", attributeKey: "active_ingredient", attributeLabel: "Active Ingredient", attributeValue: "L-Ascorbic Acid 15%, Niacinamide 2%, Hyaluronic Acid 1%", sortOrder: 1, createdAt: "2025-06-15", updatedAt: "2025-06-15" },
+  { id: "attr-2", productId: "1", scope: "product", attributeKey: "skin_type", attributeLabel: "Suitable Skin Type", attributeValue: "All skin types", sortOrder: 2, createdAt: "2025-06-15", updatedAt: "2025-06-15" },
+  { id: "attr-3", productId: "1", scope: "product", attributeKey: "fragrance", attributeLabel: "Fragrance", attributeValue: "Light citrus (natural essential oil)", sortOrder: 3, createdAt: "2025-06-15", updatedAt: "2025-06-15" },
+  { id: "attr-4", productId: "1", scope: "packaging", attributeKey: "primary_packaging", attributeLabel: "Primary Packaging", attributeValue: "30ml Frosted Glass Dropper Bottle", sortOrder: 4, createdAt: "2025-06-15", updatedAt: "2025-06-15" },
+  { id: "attr-5", productId: "1", scope: "packaging", attributeKey: "secondary_packaging", attributeLabel: "Secondary Packaging", attributeValue: "Individual Art Paper Box with UV Coating", sortOrder: 5, createdAt: "2025-06-15", updatedAt: "2025-06-15" },
+  { id: "attr-6", productId: "1", scope: "marketing", attributeKey: "target_market", attributeLabel: "Target Market", attributeValue: "Thailand, Southeast Asia", sortOrder: 6, createdAt: "2025-06-15", updatedAt: "2025-06-15" },
+  { id: "attr-7", productId: "1", scope: "marketing", attributeKey: "claim", attributeLabel: "Marketing Claims", attributeValue: "Brightening, Anti-oxidant, Dark spot reduction, Glass skin", sortOrder: 7, createdAt: "2025-06-15", updatedAt: "2025-06-15" },
+]
+
+export const mockLotMovements: LotMovement[] = [
+  { id: "mv-1", productLotId: "lot-1", productId: "1", movementType: "production_in", quantityChange: 10000, balanceBefore: 0, balanceAfter: 10000, sourceType: "job_order", sourceId: "jo-101", referenceNumber: "JO-2026-0101", notes: "Production completed", createdBy: "Admin", createdAt: "2026-02-01 08:00" },
+  { id: "mv-2", productLotId: "lot-1", productId: "1", movementType: "delivery_out", quantityChange: -1000, balanceBefore: 10000, balanceAfter: 9000, referenceNumber: "INV-2026-0032", notes: "Delivery to Glow Lab", createdBy: "Admin", createdAt: "2026-02-10 14:00" },
+  { id: "mv-3", productLotId: "lot-1", productId: "1", movementType: "delivery_out", quantityChange: -500, balanceBefore: 9000, balanceAfter: 8500, referenceNumber: "INV-2026-0045", notes: "Delivery to Glow Lab (2nd batch)", createdBy: "Admin", createdAt: "2026-02-20 10:00" },
+  { id: "mv-4", productLotId: "lot-2", productId: "1", movementType: "production_in", quantityChange: 15000, balanceBefore: 0, balanceAfter: 15000, sourceType: "job_order", sourceId: "jo-095", referenceNumber: "JO-2026-0095", createdBy: "Admin", createdAt: "2026-01-15 08:00" },
+  { id: "mv-5", productLotId: "lot-2", productId: "1", movementType: "delivery_out", quantityChange: -5000, balanceBefore: 15000, balanceAfter: 10000, referenceNumber: "INV-2026-0018", createdBy: "Admin", createdAt: "2026-01-25 11:00" },
+  { id: "mv-6", productLotId: "lot-2", productId: "1", movementType: "delivery_out", quantityChange: -6000, balanceBefore: 10000, balanceAfter: 4000, referenceNumber: "INV-2026-0028", createdBy: "Admin", createdAt: "2026-02-05 09:30" },
+  { id: "mv-7", productLotId: "lot-1", productId: "1", movementType: "damage", quantityChange: -50, balanceBefore: 8500, balanceAfter: 8450, notes: "Damaged during transport - 50 units", createdBy: "Admin", createdAt: "2026-02-22 16:00" },
+]
+
+export const mockLotMovementSummary: LotMovementSummary = {
+  totalIn: 10000,
+  totalOut: 1550,
+  netChange: 8450,
+  byType: { production_in: 10000, delivery_out: -1500, adjust: 0, return: 0, damage: -50, loss: 0 },
+}

@@ -205,6 +205,13 @@ export function ProductCreatePage() {
                   </Select>
                 </FormGroup>
 
+                <FormGroup label="Product Code">
+                  <div className="flex gap-1.5">
+                    <Input defaultValue="PRD-260302-001" readOnly className="h-9 flex-1 rounded-[10px] border-border bg-muted font-mono text-[13px] font-bold text-primary cursor-not-allowed" />
+                    <span className="flex items-center text-[9px] text-muted-foreground">Auto-generated</span>
+                  </div>
+                </FormGroup>
+
                 <FormGroup label="SKU Code" required>
                   <div className="flex gap-1.5">
                     <Input defaultValue="SKU-2026-XXXX" className="h-9 flex-1 rounded-[10px] border-border bg-secondary font-mono text-[13px] font-bold text-primary" />
@@ -236,18 +243,23 @@ export function ProductCreatePage() {
                   </FormGroup>
                 </div>
 
-                <FormGroup label="Category" required>
-                  <Select defaultValue="skincare">
-                    <SelectTrigger className="h-9 rounded-[10px] border-border bg-secondary text-[13px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {["Skincare", "Bodycare", "Haircare", "Suncare", "Makeup", "Cleanser", "Supplement", "Fragrance", "Other"].map((c) => (
-                        <SelectItem key={c.toLowerCase()} value={c.toLowerCase()}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormGroup>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <FormGroup label="Category" required>
+                    <Select defaultValue="skincare">
+                      <SelectTrigger className="h-9 rounded-[10px] border-border bg-secondary text-[13px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["Skincare", "Bodycare", "Haircare", "Suncare", "Makeup", "Cleanser", "Supplement", "Fragrance", "Other"].map((c) => (
+                          <SelectItem key={c.toLowerCase()} value={c.toLowerCase()}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormGroup>
+                  <FormGroup label="Subcategory">
+                    <Input placeholder="e.g. Serum, Cream, Toner" className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
+                  </FormGroup>
+                </div>
 
                 <FormGroup label="Description / Key Features">
                   <Textarea placeholder="Product details, key features, marketing copy..." className="min-h-[60px] rounded-[10px] border-border bg-secondary text-[13px]" />

@@ -94,10 +94,13 @@ export interface PricingTier {
   profitPerUnit: number
 }
 
+export type QualityStatus = "pending" | "approved" | "rejected"
+
 export interface ProductLot {
   id: string
   productId: string
   lotNumber: string
+  fdaLotReference?: string
   jobOrderId?: string
   jobOrderNumber?: string
   mfgDate: string
@@ -114,6 +117,9 @@ export interface ProductLot {
     specificGravity?: number
     microTest?: string
   }
+  qualityStatus: QualityStatus
+  storageLocation?: string
+  reservedQuantity: number
   inStockQty: number
   deliveredQty: number
   costPerUnit: number
@@ -182,6 +188,84 @@ export interface ProductFilters {
   status?: ProductStatus
   search?: string
   customerId?: string
+}
+
+export interface ProductSpecification {
+  id: string
+  productId: string
+  specType: "general" | "regulatory" | "stability" | "packaging" | "micro"
+  title: string
+  content: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProductAttribute {
+  id: string
+  productId: string
+  scope: "product" | "packaging" | "marketing"
+  attributeKey: string
+  attributeLabel: string
+  attributeValue: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type MovementType = "production_in" | "delivery_out" | "adjust" | "return" | "damage" | "loss"
+
+export interface LotMovement {
+  id: string
+  productLotId: string
+  productId: string
+  movementType: MovementType
+  quantityChange: number
+  balanceBefore: number
+  balanceAfter: number
+  sourceType?: string
+  sourceId?: string
+  referenceNumber?: string
+  notes?: string
+  createdBy: string
+  createdAt: string
+}
+
+export interface LotMovementSummary {
+  totalIn: number
+  totalOut: number
+  netChange: number
+  byType: Record<MovementType, number>
+}
+
+export interface TraceNode {
+  type: "product_lot" | "job_order" | "material" | "stock_lot" | "stock_card" | "supplier"
+  id: string
+  label: string
+  code?: string
+  children?: TraceNode[]
+}
+
+export interface InventoryReport {
+  totalProducts: number
+  totalLots: number
+  totalQuantity: number
+  activeLots: number
+  expiredLots: number
+  expiringSoon: number
+  byQualityStatus: {
+    approved: number
+    pending: number
+    rejected: number
+  }
+}
+
+export interface ProductInventorySummary {
+  productId: string
+  productCode: string
+  totalLots: number
+  totalRemainingQuantity: number
+  expiringWithin90Days: number
 }
 
 export interface AuditEntry {
