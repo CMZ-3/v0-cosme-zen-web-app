@@ -12,7 +12,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Dialog,
   DialogContent,
@@ -67,7 +66,7 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[720px] max-w-[720px] p-0 sm:max-w-[720px] gap-0">
         {/* Hero Header */}
-        <div className="border-b border-border bg-gradient-to-r from-secondary to-card px-6 py-5">
+        <div className="shrink-0 border-b border-border bg-gradient-to-r from-secondary to-card px-6 py-5">
           <SheetHeader className="p-0 gap-0">
             <div className="flex items-start gap-4">
               <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#e8ecf4] to-secondary border border-border">
@@ -105,8 +104,8 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="overview" className="flex-1 flex flex-col min-h-0">
-          <div className="border-b border-border px-3 overflow-x-auto">
+        <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
+          <div className="border-b border-border px-3 overflow-x-auto shrink-0">
             <TabsList className="h-10 bg-transparent p-0 gap-0">
               {[
                 { value: "images", icon: ImageIcon, label: "Images" },
@@ -131,7 +130,7 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
             </TabsList>
           </div>
 
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-y-auto">
             <div className="p-5">
               <TabsContent value="images" className="mt-0"><ImagesSection product={product} /></TabsContent>
               <TabsContent value="overview" className="mt-0 space-y-5"><OverviewSection product={product} /></TabsContent>
@@ -143,11 +142,11 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
               <TabsContent value="docs" className="mt-0 space-y-3"><DocsSection product={product} /></TabsContent>
               <TabsContent value="history" className="mt-0"><HistorySection entries={mockAudit} /></TabsContent>
             </div>
-          </ScrollArea>
+          </div>
         </Tabs>
 
         {/* Footer Actions */}
-        <div className="flex items-center gap-2 border-t border-border px-5 py-3">
+        <div className="shrink-0 flex items-center gap-2 border-t border-border px-5 py-3">
           <Button variant="outline" size="sm" className="gap-1.5 rounded-[10px] text-[11px] font-semibold">
             <Printer className="h-3.5 w-3.5" />
             Print
