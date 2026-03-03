@@ -1,0 +1,152 @@
+import type {
+  CustomerListItem,
+  CustomerDetail,
+  CustomerKPI,
+} from "./customer-types"
+
+export const mockCustomerKPI: CustomerKPI = {
+  totalCustomers: 86,
+  activeCustomers: 72,
+  totalRevenue: 24580000,
+  avgOrderValue: 185000,
+  totalBrands: 34,
+}
+
+export const mockCustomerList: CustomerListItem[] = [
+  {
+    id: "cust-1", customerCode: "CUS-260115-001", customerName: "Glow Lab Co., Ltd.", customerNameEn: "Glow Lab Co., Ltd.",
+    customerType: "juristic", customerTier: "platinum", businessType: "brand_owner",
+    contactPerson: "Natthaporn K.", email: "natthaporn@glowlab.co.th", phone: "02-123-4567",
+    creditLimit: 500000, creditUsed: 320000, isActive: true,
+    totalOrders: 48, totalRevenue: 4850000, productCount: 12, brandCount: 3,
+    leadSource: "Trade Show", province: "Bangkok", country: "Thailand",
+  },
+  {
+    id: "cust-2", customerCode: "CUS-260120-002", customerName: "SkinSoft Co., Ltd.", customerNameEn: "SkinSoft Co., Ltd.",
+    customerType: "juristic", customerTier: "gold", businessType: "brand_owner",
+    contactPerson: "Siriporn W.", email: "siriporn@skinsoft.co", phone: "02-234-5678",
+    creditLimit: 300000, creditUsed: 150000, isActive: true,
+    totalOrders: 32, totalRevenue: 3200000, productCount: 8, brandCount: 2,
+    leadSource: "Referral", province: "Nonthaburi", country: "Thailand",
+  },
+  {
+    id: "cust-3", customerCode: "CUS-260201-003", customerName: "NatuBeauty", customerNameEn: "NatuBeauty",
+    customerType: "individual", customerTier: "silver", businessType: "retailer",
+    contactPerson: "Wichit S.", email: "wichit@natubeauty.com", phone: "081-234-5678",
+    creditLimit: 100000, creditUsed: 45000, isActive: true,
+    totalOrders: 15, totalRevenue: 1150000, productCount: 5, brandCount: 1,
+    leadSource: "Website", province: "Chiang Mai", country: "Thailand",
+  },
+  {
+    id: "cust-4", customerCode: "CUS-260205-004", customerName: "BeautyKing Trading", customerNameEn: "BeautyKing Trading",
+    customerType: "juristic", customerTier: "gold", businessType: "distributor",
+    contactPerson: "Patcharin T.", email: "patcharin@beautyking.co.th", phone: "02-345-6789",
+    creditLimit: 400000, creditUsed: 280000, isActive: true,
+    totalOrders: 56, totalRevenue: 6200000, productCount: 18, brandCount: 5,
+    leadSource: "Trade Show", province: "Bangkok", country: "Thailand",
+  },
+  {
+    id: "cust-5", customerCode: "CUS-260210-005", customerName: "PureMind Co., Ltd.", customerNameEn: "PureMind Co., Ltd.",
+    customerType: "juristic", customerTier: "standard", businessType: "oem",
+    contactPerson: "Kamol P.", email: "kamol@puremind.co.th", phone: "02-456-7890",
+    creditLimit: 200000, creditUsed: 30000, isActive: true,
+    totalOrders: 8, totalRevenue: 680000, productCount: 3, brandCount: 1,
+    leadSource: "Cold Call", province: "Samut Prakan", country: "Thailand",
+  },
+  {
+    id: "cust-6", customerCode: "CUS-260215-006", customerName: "LuxeSkin International", customerNameEn: "LuxeSkin Intl.",
+    customerType: "juristic", customerTier: "platinum", businessType: "brand_owner",
+    contactPerson: "Aree M.", email: "aree@luxeskin.com", phone: "02-567-8901",
+    creditLimit: 800000, creditUsed: 550000, isActive: true,
+    totalOrders: 72, totalRevenue: 8900000, productCount: 22, brandCount: 4,
+    leadSource: "Partner", province: "Bangkok", country: "Thailand",
+  },
+  {
+    id: "cust-7", customerCode: "CUS-260220-007", customerName: "HairPro Inc.", customerNameEn: "HairPro Inc.",
+    customerType: "juristic", customerTier: "silver", businessType: "brand_owner",
+    contactPerson: "Sukit R.", email: "sukit@hairpro.co.th", phone: "02-678-9012",
+    creditLimit: 150000, creditUsed: 90000, isActive: true,
+    totalOrders: 20, totalRevenue: 1800000, productCount: 6, brandCount: 2,
+    leadSource: "Referral", province: "Pathum Thani", country: "Thailand",
+  },
+  {
+    id: "cust-8", customerCode: "CUS-260225-008", customerName: "GreenLeaf Organics", customerNameEn: "GreenLeaf Organics",
+    customerType: "juristic", customerTier: "standard", businessType: "brand_owner",
+    contactPerson: "Pranee J.", email: "pranee@greenleaf.co.th", phone: "053-123-456",
+    creditLimit: 100000, creditUsed: 10000, isActive: false,
+    totalOrders: 4, totalRevenue: 350000, productCount: 2, brandCount: 1,
+    leadSource: "Website", province: "Chiang Rai", country: "Thailand",
+  },
+  {
+    id: "cust-9", customerCode: "CUS-260228-009", customerName: "K-Glow Company", customerNameEn: "K-Glow Company",
+    customerType: "juristic", customerTier: "gold", businessType: "brand_owner",
+    contactPerson: "Thanakrit D.", email: "thanakrit@kglow.co.th", phone: "02-789-0123",
+    creditLimit: 350000, creditUsed: 200000, isActive: true,
+    totalOrders: 38, totalRevenue: 4100000, productCount: 14, brandCount: 3,
+    leadSource: "Trade Show", province: "Bangkok", country: "Thailand",
+  },
+  {
+    id: "cust-10", customerCode: "CUS-260301-010", customerName: "LuxSkin Co.", customerNameEn: "LuxSkin Co.",
+    customerType: "juristic", customerTier: "standard", businessType: "retailer",
+    contactPerson: "Onanong L.", email: "onanong@luxskin.co.th", phone: "02-890-1234",
+    creditLimit: 80000, creditUsed: 25000, isActive: true,
+    totalOrders: 6, totalRevenue: 420000, productCount: 3, brandCount: 1,
+    leadSource: "Website", province: "Phuket", country: "Thailand",
+  },
+]
+
+export const mockCustomerDetail: CustomerDetail = {
+  ...mockCustomerList[0],
+  address: "88/8 Sukhumvit Soi 55, Klongton Nua",
+  city: "Watthana",
+  postalCode: "10110",
+  taxId: "0105564012345",
+  branchCode: "00000",
+  creditDays: 30,
+  salesRepresentative: "Somchai T.",
+  website: "https://glowlab.co.th",
+  fax: "02-123-4568",
+  lineId: "@glowlab",
+  logoUrl: undefined,
+  notes: "Key strategic partner. Prefers natural/organic formulations. Annual review scheduled Q2.",
+  contacts: [
+    { id: "cc-1", contactName: "Natthaporn Kittisak", position: "CEO", email: "natthaporn@glowlab.co.th", phone: "02-123-4567", lineId: "natthaporn.k", department: "Management", isPrimary: true },
+    { id: "cc-2", contactName: "Siriwan Phongphat", position: "Procurement Manager", email: "siriwan@glowlab.co.th", phone: "02-123-4569", lineId: "siriwan.p", department: "Procurement", isPrimary: false },
+    { id: "cc-3", contactName: "Chalerm Jaidee", position: "QA Manager", email: "chalerm@glowlab.co.th", phone: "02-123-4570", department: "Quality", isPrimary: false },
+  ],
+  addresses: [
+    { id: "ca-1", addressType: "registered", addressName: "Head Office", addressLine1: "88/8 Sukhumvit Soi 55, Klongton Nua", province: "Bangkok", postalCode: "10110", country: "Thailand", isDefault: true, isFdaApproved: true },
+    { id: "ca-2", addressType: "shipping", addressName: "Warehouse Bangna", addressLine1: "99 Bangna-Trad Rd, Km 12", province: "Samut Prakan", postalCode: "10540", country: "Thailand", isDefault: true },
+    { id: "ca-3", addressType: "billing", addressName: "Billing Address", addressLine1: "88/8 Sukhumvit Soi 55, Klongton Nua", province: "Bangkok", postalCode: "10110", country: "Thailand", isDefault: true },
+  ],
+  brands: [
+    { id: "cb-1", brandName: "GlowUp", brandNameEn: "GlowUp", brandColor: "#10b981", brandCategory: "Skincare", isActive: true },
+    { id: "cb-2", brandName: "NatuGlow", brandNameEn: "NatuGlow", brandColor: "#f59e0b", brandCategory: "Organic", isActive: true },
+    { id: "cb-3", brandName: "GlowLab Pro", brandNameEn: "GlowLab Pro", brandColor: "#6366f1", brandCategory: "Professional", isActive: true },
+  ],
+  contracts: [
+    { id: "ct-1", contractNumber: "CTR-260101-001", contractName: "OEM Manufacturing 2026", contractType: "oem_manufacturing", status: "active", startDate: "2026-01-01", endDate: "2026-12-31", autoRenew: true, currency: "THB", totalValue: 2400000 },
+    { id: "ct-2", contractNumber: "CTR-250601-002", contractName: "NDA Agreement", contractType: "nda", status: "active", startDate: "2025-06-01", endDate: "2027-05-31", autoRenew: false, currency: "THB" },
+  ],
+  briefs: [
+    { id: "br-1", briefNumber: "BRF-260201-001", title: "Vitamin C Serum 15% Reformulation", productType: "Serum", cosmeticForm: "Gel-serum", status: "approved", assignedTo: "R&D Team", createdAt: "2026-02-01" },
+    { id: "br-2", briefNumber: "BRF-260215-002", title: "New Anti-Aging Night Cream", productType: "Cream", cosmeticForm: "Cream", status: "reviewing", assignedTo: "Somchai T.", createdAt: "2026-02-15" },
+    { id: "br-3", briefNumber: "BRF-260228-003", title: "SPF50 Sunscreen Reformulation", productType: "Sunscreen", cosmeticForm: "Lotion", status: "received", assignedTo: "Pending", createdAt: "2026-02-28" },
+  ],
+  complaints: [
+    { id: "cmp-1", complaintNumber: "CMP-260115-001", title: "Serum discoloration batch 2601", category: "quality", severity: "medium", status: "resolved", productName: "Vitamin C Serum", assignedTo: "QA Team", reportedDate: "2026-01-15" },
+    { id: "cmp-2", complaintNumber: "CMP-260220-002", title: "Late delivery for order JO-260210", category: "delivery", severity: "low", status: "closed", assignedTo: "Logistics", reportedDate: "2026-02-20" },
+  ],
+  contactLogs: [
+    { id: "cl-1", channel: "meeting", contactDate: "2026-03-01", subject: "Q1 Review Meeting", summary: "Reviewed Q1 production schedule. Discussed new brief for anti-aging line.", contactName: "Natthaporn Kittisak", internalUser: "Somchai T.", isFollowUpDone: true },
+    { id: "cl-2", channel: "email", contactDate: "2026-02-25", subject: "Pricing Update for 2026", summary: "Sent updated pricing sheet for all formulations.", contactName: "Siriwan Phongphat", internalUser: "Somchai T.", followUpDate: "2026-03-10", isFollowUpDone: false },
+    { id: "cl-3", channel: "phone", contactDate: "2026-02-20", subject: "Delivery Schedule Inquiry", contactName: "Siriwan Phongphat", internalUser: "Admin", isFollowUpDone: true },
+  ],
+  documents: [
+    { id: "cd-1", documentType: "contract", title: "OEM Agreement 2026", fileName: "oem_agreement_2026.pdf", fileSize: 2450000, createdAt: "2026-01-05" },
+    { id: "cd-2", documentType: "certificate", title: "Business Registration", fileName: "biz_reg_glowlab.pdf", fileSize: 1200000, createdAt: "2025-06-15" },
+    { id: "cd-3", documentType: "license", title: "FDA License Copy", fileName: "fda_license_glowlab.pdf", fileSize: 890000, createdAt: "2025-08-20" },
+  ],
+  createdAt: "2025-06-15",
+  updatedAt: "2026-03-01",
+}
