@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans, Space_Mono } from 'next/font/google'
 import { Toaster } from 'sonner'
+import { AppShell } from '@/components/app-shell'
 import './globals.css'
 
 const _plusJakarta = Plus_Jakarta_Sans({
@@ -28,7 +29,9 @@ export default function RootLayout({
   return (
     <html lang="th">
       <body className="font-sans antialiased">
-        {children}
+        <AppShell>
+          {children}
+        </AppShell>
         <Toaster position="bottom-center" richColors />
       </body>
     </html>

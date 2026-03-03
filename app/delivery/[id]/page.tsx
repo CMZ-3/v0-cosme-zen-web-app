@@ -2,6 +2,7 @@
 
 import { use, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import {
   ArrowLeft,
   PackageCheck,
@@ -21,6 +22,7 @@ import {
   FileText,
   Camera,
   Pen,
+  ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -119,17 +121,12 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
     <div className="flex flex-col h-screen overflow-y-auto pb-12">
       {/* Header */}
       <div className="px-8 pt-5 pb-4 flex-shrink-0 border-b border-border bg-card">
-        <div className="flex items-center gap-3 mb-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 rounded-[10px] text-[12px] text-muted-foreground"
-            onClick={() => router.push("/delivery")}
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back
-          </Button>
-        </div>
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1 text-[11px] text-muted-foreground mb-3">
+          <Link href="/delivery" className="hover:text-primary transition-colors font-medium">Delivery Orders</Link>
+          <ChevronRight className="h-3 w-3" />
+          <span className="font-semibold text-foreground">{order.deliveryNumber}</span>
+        </nav>
 
         {/* Hero Section */}
         <div className="flex items-center gap-4 rounded-2xl border border-border bg-secondary/30 p-4 mb-4">

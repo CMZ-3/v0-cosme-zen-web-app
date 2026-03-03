@@ -1,7 +1,8 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Copy, RotateCcw, Pencil } from "lucide-react"
+import Link from "next/link"
+import { ArrowLeft, Copy, RotateCcw, Pencil, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FdaStatusActions } from "@/components/fda/fda-status-actions"
@@ -28,6 +29,13 @@ export default function FdaDetailPage() {
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Header */}
       <div className="shrink-0 border-b border-border bg-card px-6 py-4">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1 text-[11px] text-muted-foreground mb-2">
+          <Link href="/fda" className="hover:text-primary transition-colors font-medium">FDA / Reg.</Link>
+          <ChevronRight className="h-3 w-3" />
+          <span className="font-semibold text-foreground truncate max-w-[200px]">{data.registrationCode}</span>
+        </nav>
+
         <div className="flex items-center gap-3 mb-3">
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => router.push("/fda")}>
             <ArrowLeft className="h-4 w-4" />
