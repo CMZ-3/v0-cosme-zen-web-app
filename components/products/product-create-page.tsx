@@ -140,8 +140,12 @@ export function ProductCreatePage() {
             </button>
           </Link>
           <div>
+            <nav className="flex items-center gap-1 text-[10px] text-muted-foreground mb-0.5">
+              <Link href="/products" className="hover:text-primary transition-colors">Products</Link>
+              <span>/</span>
+              <span className="font-semibold text-foreground">Create New</span>
+            </nav>
             <h1 className="text-xl font-extrabold tracking-tight text-foreground">Create New Product</h1>
-            <p className="text-[11px] text-muted-foreground">Draft Mode - Fill in product details, BOM, costing & pricing</p>
           </div>
         </div>
         <div className="flex items-center gap-2">

@@ -18,17 +18,18 @@ import { ProductKPIStats } from "./product-kpi-stats"
 import { ProductTable } from "./product-table"
 import { ProductCardGrid } from "./product-card-grid"
 import { ProductDetailDrawer } from "./product-detail-drawer"
-import { mockProducts, mockKPI } from "@/lib/mock-data"
-import type { ProductCategory, ProductStatus } from "@/lib/product-types"
+import { mockProducts } from "@/lib/mock-data"
+import type { ProductKPISummary } from "@/lib/product-types"
+import { cn } from "@/lib/utils"
 import Link from "next/link"
 
-const categories: { value: string; label: string; count: number }[] = [
-  { value: "all", label: "All", count: 248 },
-  { value: "skincare", label: "Skincare", count: 124 },
-  { value: "bodycare", label: "Bodycare", count: 48 },
-  { value: "haircare", label: "Haircare", count: 28 },
-  { value: "supplement", label: "Supplement", count: 22 },
-  { value: "other", label: "Other", count: 26 },
+const categoryDefs = [
+  { value: "all", label: "All" },
+  { value: "skincare", label: "Skincare" },
+  { value: "bodycare", label: "Bodycare" },
+  { value: "haircare", label: "Haircare" },
+  { value: "supplement", label: "Supplement" },
+  { value: "other", label: "Other" },
 ]
 
 const statusFilters: { value: string; label: string }[] = [
@@ -47,10 +48,38 @@ export function ProductListPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
 
+  // Dynamic category counts
+  const categories = useMemo(() => {
+    return categoryDefs.map((cat) => ({
+      ...cat,
+      count: cat.value === "all"
+        ? mockProducts.length
+        : mockProducts.filter((p) => {
+            const otherCats = categoryDefs.filter((c) => c.value !== "all" && c.value !== "other").map((c) => c.value)
+            if (cat.value === "other") return !otherCats.includes(p.category)
+            return p.category === cat.value
+          }).length,
+    }))
+  }, [])
+
+  // Dynamic KPI
+  const kpi: ProductKPISummary = useMemo(() => ({
+    total: mockProducts.length,
+    active: mockProducts.filter((p) => p.status === "active").length,
+    inDevelopment: mockProducts.filter((p) => p.status === "in_development").length,
+    fdaWarning: mockProducts.filter((p) => p.fdaStatus === "expired" || p.fdaStatus === "pending").length,
+    discontinued: mockProducts.filter((p) => p.status === "discontinued").length,
+  }), [])
+
   const filteredProducts = useMemo(() => {
     let items = mockProducts
     if (activeCategory !== "all") {
-      items = items.filter((p) => p.category === activeCategory)
+      const otherCats = categoryDefs.filter((c) => c.value !== "all" && c.value !== "other").map((c) => c.value)
+      if (activeCategory === "other") {
+        items = items.filter((p) => !otherCats.includes(p.category))
+      } else {
+        items = items.filter((p) => p.category === activeCategory)
+      }
     }
     if (activeStatus !== "all") {
       items = items.filter((p) => p.status === activeStatus)
@@ -107,24 +136,30 @@ export function ProductListPage() {
         {/* Category Tabs */}
         <Tabs value={activeCategory} onValueChange={setActiveCategory} className="mb-5">
           <TabsList className="h-10 bg-card border border-border rounded-xl p-1 gap-0.5">
-            {categories.map((cat) => (
-              <TabsTrigger
-                key={cat.value}
-                value={cat.value}
-                className="rounded-lg px-3.5 py-1.5 text-[12px] font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_2px_6px_rgba(76,139,245,0.25)]"
-              >
-                {cat.label}
-                <span className="ml-1.5 rounded-md bg-secondary/80 px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground data-[state=active]:bg-primary-foreground/20 data-[state=active]:text-primary-foreground">
-                  {cat.count}
-                </span>
-              </TabsTrigger>
-            ))}
+            {categories.map((cat) => {
+              const isActive = activeCategory === cat.value
+              return (
+                <TabsTrigger
+                  key={cat.value}
+                  value={cat.value}
+                  className="rounded-lg px-3.5 py-1.5 text-[12px] font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_2px_6px_rgba(76,139,245,0.25)]"
+                >
+                  {cat.label}
+                  <span className={cn(
+                    "ml-1.5 rounded-md px-1.5 py-0.5 text-[9px] font-bold",
+                    isActive ? "bg-primary-foreground/20 text-primary-foreground" : "bg-secondary/80 text-muted-foreground"
+                  )}>
+                    {cat.count}
+                  </span>
+                </TabsTrigger>
+              )
+            })}
           </TabsList>
         </Tabs>
 
         {/* KPI Stats */}
         <div className="mb-5">
-          <ProductKPIStats data={mockKPI} />
+          <ProductKPIStats data={kpi} />
         </div>
 
         {/* Search + View Toggle + Filter Chips */}
@@ -169,7 +204,25 @@ export function ProductListPage() {
         </div>
 
         {/* Content */}
-        {viewMode === "table" ? (
+        {filteredProducts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-16">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary">
+              <ShoppingBag className="h-7 w-7 text-muted-foreground/40" />
+            </div>
+            <p className="mt-4 text-sm font-bold text-foreground">No products found</p>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              {search ? `No results for "${search}"` : "Try adjusting your filters"}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4 rounded-[10px] text-[11px] font-semibold"
+              onClick={() => { setSearch(""); setActiveCategory("all"); setActiveStatus("all") }}
+            >
+              Clear all filters
+            </Button>
+          </div>
+        ) : viewMode === "table" ? (
           <ProductTable products={filteredProducts} onRowClick={handleRowClick} />
         ) : (
           <ProductCardGrid products={filteredProducts} onCardClick={handleRowClick} />

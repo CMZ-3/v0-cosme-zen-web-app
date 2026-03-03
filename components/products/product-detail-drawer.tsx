@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Fragment } from "react"
 import {
   Sheet,
   SheetContent,
@@ -628,9 +628,8 @@ function LotsSection({ lots }: { lots: ProductLot[] }) {
               const isExpanded = expandedLot === lot.id
               const lotMovements = mockLotMovements.filter((m) => m.productLotId === lot.id)
               return (
-                <>
+                <Fragment key={lot.id}>
                   <tr
-                    key={lot.id}
                     className={cn("border-b border-border last:border-0 cursor-pointer hover:bg-secondary/50 transition-colors", lot.status === "rejected" && "opacity-60")}
                     onClick={() => setExpandedLot(isExpanded ? null : lot.id)}
                   >
@@ -750,7 +749,7 @@ function LotsSection({ lots }: { lots: ProductLot[] }) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               )
             })}
           </tbody>
