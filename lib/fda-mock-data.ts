@@ -6,12 +6,12 @@ import type {
 
 // KPI Summary
 export const mockFdaKPI: FdaKPISummary = {
-  total: 48,
-  totalJk: 32,
-  totalJr: 16,
-  approved: 28,
-  draft: 8,
-  submitted: 5,
+  total: 155,
+  totalJk: 120,
+  totalJr: 35,
+  approved: 124,
+  draft: 15,
+  submitted: 8,
   rejected: 2,
   expired: 3,
   expiring30: 2,
@@ -19,18 +19,18 @@ export const mockFdaKPI: FdaKPISummary = {
   expiring90: 9,
 }
 
-// List Items
+// List Items -- matching screenshot design
 export const mockFdaList: FdaListItem[] = [
-  { id: "fda-1", registrationCode: "FDA-260115-001", registrationType: "jk", registrationNumber: "10-1-6800012345", productNameTh: "เซรั่มวิตามินซี 15% ไบร์ทเทนนิ่ง", productNameEn: "Vitamin C 15% Brightening Serum", tradeName: "GlowLab", cosmeticType: "Serum", status: "approved", expiryDate: "2029-01-15", daysUntilExpiry: 1048, customerName: "Glow Lab Co., Ltd.", manufacturerName: "CosmeZen Factory", renewalCount: 0, createdAt: "2026-01-15" },
-  { id: "fda-2", registrationCode: "FDA-260120-002", registrationType: "jk", registrationNumber: "10-1-6800012389", productNameTh: "มอยส์เจอไรเซอร์ ไฮยาลูรอน 3D", productNameEn: "Hyaluron 3D Moisturizer", tradeName: "SkinFirst", cosmeticType: "Cream", status: "approved", expiryDate: "2029-01-20", daysUntilExpiry: 1053, customerName: "SkinFirst Thailand", manufacturerName: "CosmeZen Factory", renewalCount: 0, createdAt: "2026-01-20" },
-  { id: "fda-3", registrationCode: "FDA-260201-003", registrationType: "jr", registrationNumber: "10-2-6800005678", productNameTh: "ครีมกันแดด SPF50+ PA++++", productNameEn: "UV Shield SPF50+ PA++++", tradeName: "Derma Plus", cosmeticType: "Sunscreen", status: "approved", expiryDate: "2026-04-01", daysUntilExpiry: 29, customerName: "Derma Plus Group", manufacturerName: "CosmeZen Factory", renewalCount: 1, createdAt: "2026-02-01" },
-  { id: "fda-4", registrationCode: "FDA-260205-004", registrationType: "jk", productNameTh: "เจลล้างหน้า Tea Tree", productNameEn: "Tea Tree Cleansing Gel", tradeName: "PureSkin", cosmeticType: "Cleanser", status: "draft", customerName: "PureSkin Brand", manufacturerName: "CosmeZen Factory", renewalCount: 0, createdAt: "2026-02-05" },
-  { id: "fda-5", registrationCode: "FDA-260210-005", registrationType: "jk", productNameTh: "ทินท์ลิป เชอร์รี่โรส", productNameEn: "Cherry Rose Lip Tint", tradeName: "Bloom", cosmeticType: "Lip Product", status: "submitted", submittedDate: "2026-02-15", customerName: "Bloom Beauty Co.", manufacturerName: "CosmeZen Factory", renewalCount: 0, createdAt: "2026-02-10" },
-  { id: "fda-6", registrationCode: "FDA-260215-006", registrationType: "jr", registrationNumber: "10-2-6800005999", productNameTh: "อายครีม เรตินอล 0.5%", productNameEn: "Retinol 0.5% Eye Cream", tradeName: "AgeLess", cosmeticType: "Eye Cream", status: "rejected", rejectionReason: "Retinol concentration requires additional safety data", customerName: "AgeLess Co.", manufacturerName: "CosmeZen Factory", renewalCount: 0, createdAt: "2026-02-15" },
-  { id: "fda-7", registrationCode: "FDA-260220-007", registrationType: "jk", registrationNumber: "10-1-6700098765", productNameTh: "โลชั่นบำรุงผิว อโลเวร่า", productNameEn: "Aloe Vera Body Lotion", tradeName: "NaturaCare", cosmeticType: "Lotion", status: "expired", expiryDate: "2026-02-01", customerName: "NaturaCare Ltd.", manufacturerName: "CosmeZen Factory", renewalCount: 2, createdAt: "2023-02-20" },
-  { id: "fda-8", registrationCode: "FDA-260225-008", registrationType: "jk", productNameTh: "แชมพูลดผมร่วง บิโอติน", productNameEn: "Biotin Anti Hair Loss Shampoo", tradeName: "HairPro", cosmeticType: "Shampoo", status: "draft", customerName: "HairPro Inc.", manufacturerName: "CosmeZen Factory", renewalCount: 0, createdAt: "2026-02-25" },
-  { id: "fda-9", registrationCode: "FDA-260228-009", registrationType: "jr", productNameTh: "เซรั่มไนอาซินาไมด์ 10%", productNameEn: "Niacinamide 10% Serum", tradeName: "GlowLab", cosmeticType: "Serum", status: "submitted", submittedDate: "2026-03-01", customerName: "Glow Lab Co., Ltd.", manufacturerName: "CosmeZen Factory", renewalCount: 0, createdAt: "2026-02-28" },
-  { id: "fda-10", registrationCode: "FDA-260301-010", registrationType: "jk", productNameTh: "มาส์กหน้า คอลลาเจนทอง", productNameEn: "Gold Collagen Sheet Mask", tradeName: "LuxSkin", cosmeticType: "Mask", status: "draft", customerName: "LuxSkin Co.", manufacturerName: "CosmeZen Factory", renewalCount: 0, createdAt: "2026-03-01" },
+  { id: "fda-1", registrationCode: "FDA-260115-001", registrationType: "jk", registrationNumber: "10-1-67-00234", productNameTh: "เซรั่มวิตามินซี ไบร์ทเทนนิ่ง 15%", productNameEn: "GlowUp Vitamin C Serum", tradeName: "GlowUp", cosmeticType: "Serum", status: "approved", expiryDate: "2028-01-20", daysUntilExpiry: 698, customerName: "Glow Lab Co., Ltd.", manufacturerName: "CosmeZen Factory", renewalCount: 0, ingredientCount: 12, serviceFee: 3500, createdAt: "2026-01-15" },
+  { id: "fda-2", registrationCode: "FDA-260120-002", registrationType: "jk", registrationNumber: "10-1-65-00087", productNameTh: "ครีมกันแดด UV Shield SPF50 PA+++", productNameEn: "SoftTouch UV Shield", tradeName: "SoftTouch", cosmeticType: "Sunscreen", status: "approved", expiryDate: "2026-03-07", daysUntilExpiry: 15, customerName: "SkinSoft Co., Ltd.", manufacturerName: "CosmeZen Factory", renewalCount: 0, ingredientCount: 18, serviceFee: 5000, createdAt: "2026-01-20" },
+  { id: "fda-3", registrationCode: "FDA-260201-003", registrationType: "jk", productNameTh: "ไฮยาลูรอนิค แอซิด โทนเนอร์", productNameEn: "NatuGlow HA Toner", tradeName: "NatuGlow", cosmeticType: "Toner", status: "submitted", submittedDate: "2026-02-20", customerName: "NatuBeauty", manufacturerName: "CosmeZen Factory", renewalCount: 0, ingredientCount: 8, serviceFee: 3500, createdAt: "2026-02-01" },
+  { id: "fda-4", registrationCode: "FDA-260205-004", registrationType: "jk", productNameTh: "สลีปปิ้งมาส์ก โกลว์ โอเวอร์ไนท์", productNameEn: "K-Glow Sleeping Mask", tradeName: "K-Glow", cosmeticType: "Mask", status: "draft", customerName: "BeautyKing Trading", manufacturerName: "CosmeZen Factory", renewalCount: 0, ingredientCount: 10, serviceFee: 3500, createdAt: "2026-02-05" },
+  { id: "fda-5", registrationCode: "FDA-260210-005", registrationType: "jr", registrationNumber: "76-2-63-00012", productNameTh: "โลชั่นบำรุงผิว มอยส์เจอร์ พลัส", productNameEn: "ClearSkin Moisture Lotion", tradeName: "ClearSkin", cosmeticType: "Lotion", status: "expired", expiryDate: "2026-01-15", customerName: "PureMind Co., Ltd.", manufacturerName: "CosmeZen Factory", renewalCount: 1, ingredientCount: 14, serviceFee: 2000, createdAt: "2023-02-10" },
+  { id: "fda-6", registrationCode: "FDA-260215-006", registrationType: "jk", productNameTh: "อาย ครีม แอนตี้ริ้วรอย", productNameEn: "LuxeGlow Eye Cream", tradeName: "LuxeGlow", cosmeticType: "Eye Cream", status: "rejected", customerName: "LuxeSkin Intl.", manufacturerName: "CosmeZen Factory", renewalCount: 0, ingredientCount: 9, serviceFee: 3500, createdAt: "2026-02-15" },
+  { id: "fda-7", registrationCode: "FDA-260220-007", registrationType: "jk", registrationNumber: "10-1-66-00456", productNameTh: "เจลล้างหน้า Tea Tree", productNameEn: "PureSkin Cleansing Gel", tradeName: "PureSkin", cosmeticType: "Cleanser", status: "approved", expiryDate: "2029-03-20", daysUntilExpiry: 1113, customerName: "PureSkin Brand", manufacturerName: "CosmeZen Factory", renewalCount: 0, ingredientCount: 11, serviceFee: 3500, createdAt: "2026-02-20" },
+  { id: "fda-8", registrationCode: "FDA-260225-008", registrationType: "jk", productNameTh: "แชมพูลดผมร่วง บิโอติน", productNameEn: "Biotin Anti Hair Loss Shampoo", tradeName: "HairPro", cosmeticType: "Shampoo", status: "draft", customerName: "HairPro Inc.", manufacturerName: "CosmeZen Factory", renewalCount: 0, ingredientCount: 13, serviceFee: 3500, createdAt: "2026-02-25" },
+  { id: "fda-9", registrationCode: "FDA-260228-009", registrationType: "jr", productNameTh: "เซรั่มไนอาซินาไมด์ 10%", productNameEn: "Niacinamide 10% Serum", tradeName: "GlowLab", cosmeticType: "Serum", status: "submitted", submittedDate: "2026-03-01", customerName: "Glow Lab Co., Ltd.", manufacturerName: "CosmeZen Factory", renewalCount: 0, ingredientCount: 7, serviceFee: 5000, createdAt: "2026-02-28" },
+  { id: "fda-10", registrationCode: "FDA-260301-010", registrationType: "jk", productNameTh: "มาส์กหน้า คอลลาเจนทอง", productNameEn: "Gold Collagen Sheet Mask", tradeName: "LuxSkin", cosmeticType: "Mask", status: "draft", customerName: "LuxSkin Co.", manufacturerName: "CosmeZen Factory", renewalCount: 0, ingredientCount: 6, serviceFee: 3500, createdAt: "2026-03-01" },
 ]
 
 // Detail registration (full)

@@ -81,6 +81,9 @@ export interface FdaListItem {
   customerName?: string
   manufacturerName?: string
   renewalCount: number
+  ingredientCount?: number
+  serviceFee?: number
+  submittedDate?: string
   createdAt: string
 }
 
