@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ChevronDown, ChevronUp, Check, Download, Plus, Zap, Target, CheckCircle, AlertTriangle, BarChart3, Percent } from "lucide-react"
+import { ChevronDown, ChevronUp, Check, Download, Plus, Zap, Target, CheckCircle, AlertTriangle, BarChart3, Percent, Package } from "lucide-react"
 import type { JobOrder, ProductionStep, TrackingStats, DailyRecord } from "@/lib/job-order-types"
 
 interface Props {
@@ -49,14 +49,6 @@ export function DailyTrackingTab({ jobOrder, stats }: Props) {
         ))}
       </div>
     </div>
-  )
-}
-
-function Package({ className }: { className?: string }) {
-  return (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16.5 9.4 7.55 4.24" /><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.29 7 12 12 20.71 7" /><line x1="12" x2="12" y1="22" y2="12" />
-    </svg>
   )
 }
 
