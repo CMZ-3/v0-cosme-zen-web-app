@@ -18,16 +18,17 @@ import {
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-const menuItems = [
+const menuItems: { label: string; icon: typeof LayoutDashboard; href: string; badge?: number }[] = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/" },
+  { label: "Job Orders", icon: ClipboardList, href: "/job-orders", badge: 5 },
+  { label: "Products", icon: ShoppingBag, href: "/products" },
   { label: "Stock v3", icon: Package, href: "/stock" },
   { label: "Formulas", icon: FlaskConical, href: "/formulas" },
   { label: "Production", icon: Factory, href: "/production" },
-  { label: "Products", icon: ShoppingBag, href: "/products" },
   { label: "Customers", icon: Users, href: "/customers" },
   { label: "Suppliers", icon: Truck, href: "/suppliers" },
   { label: "Delivery", icon: Mail, href: "/delivery" },
-  { label: "FDA / อย.", icon: ClipboardList, href: "/fda" },
+  { label: "FDA / Reg.", icon: ClipboardList, href: "/fda" },
   { label: "Accounting", icon: DollarSign, href: "/accounting" },
 ]
 
@@ -66,6 +67,14 @@ export function AppSidebar() {
             >
               <item.icon className="h-[18px] w-[18px] opacity-75" />
               {item.label}
+              {item.badge && (
+                <span className={cn(
+                  "ml-auto rounded-full px-1.5 py-px text-[10px] font-bold",
+                  isActive ? "bg-primary-foreground/30 text-primary-foreground" : "bg-destructive text-destructive-foreground"
+                )}>
+                  {item.badge}
+                </span>
+              )}
             </Link>
           )
         })}

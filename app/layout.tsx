@@ -16,8 +16,8 @@ const _spaceMono = Space_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'CosmeZen - Product Management',
-  description: 'CosmeZen Cosmetics OEM/ODM Management System - Product Module',
+  title: 'CosmeZen - OEM Cosmetics Factory',
+  description: 'CosmeZen Cosmetics OEM/ODM Management System - Production & Job Orders',
 }
 
 export default function RootLayout({
