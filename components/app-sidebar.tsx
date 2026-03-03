@@ -9,7 +9,7 @@ import {
   ShoppingBag,
   Users,
   Truck,
-  Mail,
+  PackageCheck,
   ClipboardList,
   DollarSign,
   Settings,
@@ -28,7 +28,7 @@ const menuItems: { label: string; icon: typeof LayoutDashboard; href: string; ba
   { label: "Production", icon: Factory, href: "/production" },
   { label: "Customers", icon: Users, href: "/customers" },
   { label: "Suppliers", icon: Truck, href: "/suppliers" },
-  { label: "Delivery", icon: Mail, href: "/delivery" },
+  { label: "Delivery", icon: PackageCheck, href: "/delivery", badge: 4 },
   { label: "FDA / Reg.", icon: ShieldCheck, href: "/fda" },
   { label: "Accounting", icon: DollarSign, href: "/accounting" },
 ]
