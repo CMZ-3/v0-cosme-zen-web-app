@@ -14,6 +14,7 @@ import {
   DollarSign,
   Settings,
   LogOut,
+  ShieldCheck,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -28,7 +29,7 @@ const menuItems: { label: string; icon: typeof LayoutDashboard; href: string; ba
   { label: "Customers", icon: Users, href: "/customers" },
   { label: "Suppliers", icon: Truck, href: "/suppliers" },
   { label: "Delivery", icon: Mail, href: "/delivery" },
-  { label: "FDA / Reg.", icon: ClipboardList, href: "/fda" },
+  { label: "FDA / Reg.", icon: ShieldCheck, href: "/fda" },
   { label: "Accounting", icon: DollarSign, href: "/accounting" },
 ]
 
