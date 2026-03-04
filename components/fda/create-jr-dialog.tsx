@@ -95,7 +95,19 @@ export function CreateJrDialog({ open, onOpenChange, initialData }: Props) {
   const handleOpenChange = useCallback((o: boolean) => {
     if (o && initialData) {
       setForm({ ...EMPTY_JR, ...initialData })
-      setStep(0)
+      // Jump to review if we have enough data from import
+      const hasReg = !!(initialData.regNumber)
+      const hasProduct = !!(initialData.productNameTh || initialData.productNameEn)
+      const hasBiz = !!(initialData.cm_contractorName || initialData.ms_manufacturerName || initialData.imp_importerName)
+      if (hasReg && hasProduct && hasBiz) {
+        setStep(3) // review
+      } else if (hasProduct && hasBiz) {
+        setStep(2) // business
+      } else if (hasProduct) {
+        setStep(1) // product
+      } else {
+        setStep(0)
+      }
     }
     if (!o) { setStep(0); setForm({ ...EMPTY_JR }) }
     onOpenChange(o)

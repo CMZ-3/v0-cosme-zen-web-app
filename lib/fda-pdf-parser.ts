@@ -142,68 +142,76 @@ export function parseFdaPdfText(rawText: string): ParsedFdaData {
 
   // === จ.ร. (Receipt) parsing ===
   if (regType === "jr") {
-    // Registration number
-    const regNo = extractAfter(text, /เลขที่ใบรับจดแจ้ง\s*(?:เลขที่)?\s*[:：]?/i) ||
-                  extractAfter(text, /ใบรับจดแจ้งเลขที่\s*[:：]?/i)
+    // Registration number -- multiple patterns
+    result.regNumber = extractAfter(text, /ใบรับจดแจ้ง\s*(?:เครื่องสำอาง|เครื่องสําอาง)?\s*เลขที่\s*[:：]?/i)
+      || extractAfter(text, /เลขที่ใบรับจดแจ้ง\s*[:：]?/i)
+      || extractAfter(text, /เลขที่\s*[:：]?\s*(\d[\d-]+)/i)
+      || ""
 
-    // Product name Thai
-    const productTh = extractAfter(text, /ชื่อการค้าและชื่อเครื่องสำอาง\s*\(ไทย\)\s*[:：]?/i) ||
-                      extractAfter(text, /ชื่อการค้าและชื่อเครื่องสําอาง\s*\(ไทย\)\s*[:：]?/i)
-    const productEn = extractAfter(text, /ชื่อการค้าและชื่อเครื่องสำอาง\s*\(อังกฤษ\)\s*[:：]?/i) ||
-                      extractAfter(text, /ชื่อการค้าและชื่อเครื่องสําอาง\s*\(อังกฤษ\)\s*[:：]?/i)
+    // Dates
+    result.issueDate = extractAfter(text, /ออกให้\s*ณ\s*วันที่\s*[:：]?/i)
+      || extractAfter(text, /วันที่ออก\s*[:：]?/i)
+      || ""
+
+    result.expiryDate = extractAfter(text, /ใช้ได้จนถึงวันที่\s*[:：]?/i)
+      || extractAfter(text, /หมดอายุ\s*[:：]?/i)
+      || ""
+
+    // Issued by
+    result.issuedBy = extractAfter(text, /ออกโดย\s*[:：]?/i)
+      || extractBetween(text, /ออกให้\s*ณ\s*วันที่.*?\n/i, /\n/i)
+      || ""
+
+    // Product name Thai / EN
+    result.productNameTh = extractAfter(text, /ชื่อการค้าและชื่อเครื่อง(?:สำอาง|สําอาง)\s*\(?ไทย\)?\s*[:：]?/i) || ""
+    result.productNameEn = extractAfter(text, /ชื่อการค้าและชื่อเครื่อง(?:สำอาง|สําอาง)\s*\(?(?:อังกฤษ|EN)\)?\s*[:：]?/i) || ""
+
+    // Product name suffix
+    result.productNameSuffix = extractAfter(text, /ชื่อเครื่อง(?:สำอาง|สําอาง)แนบท้าย\s*[:：]?/i) || ""
 
     // Cosmetic type
-    const cosmeticType = extractAfter(text, /ประเภทของเครื่องสำอาง\s*[:：]?/i) ||
-                         extractAfter(text, /ประเภทของเครื่องสําอาง\s*[:：]?/i)
+    const cosmeticType = extractAfter(text, /ประเภทของเครื่อง(?:สำอาง|สําอาง)\s*[:：]?/i) || ""
+    result.cosmeticType = cosmeticType
 
-    // Physical form
-    const physicalFormRaw = extractAfter(text, /ลักษณะทางกายภาพของเครื่องสำอาง(?:และภาชนะบรรจุ)?\s*[:：]?/i) ||
-                            extractAfter(text, /ลักษณะทางกายภาพของเครื่องสําอาง(?:และภาชนะบรรจุ)?\s*[:：]?/i)
-
-    // Product format
-    const productFormat = extractAfter(text, /รูปแบบของเครื่องสำอาง\s*[:：]?/i) ||
-                          extractAfter(text, /รูปแบบของเครื่องสําอาง\s*[:：]?/i)
-
-    // Manufacturer
-    const contractorName = extractAfter(text, /ชื่อผู้รับจ้างผลิต\s*[:：]?/i)
-    const factoryAddr = extractBetween(text, /ที่ตั้งสถานที่ผลิต\s*[:：]?/i, /ที่ตั้งสถานที่เก็บ/i)
-    const storageAddr = extractBetween(text, /ที่ตั้งสถานที่เก็บ\s*[:：]?/i, /ชื่อผู้ว่าจ้าง/i)
-    const clientName = extractAfter(text, /ชื่อผู้ว่าจ้างผลิต\s*[:：]?/i)
-    const clientAddr = extractBetween(text, /ที่ตั้งสถานที่ประกอบธุรกิจ\s*[:：]?/i, /เลขที่ใบรับจดแจ้งของเครื่องสำอาง/i) ||
-                       extractBetween(text, /ที่ตั้งสถานที่ประกอบธุรกิจ\s*[:：]?/i, /เลขที่ใบรับจดแจ้งของเครื่องสําอาง/i)
-
-    // Split product name: trade name vs cosmetic name
-    // For จร, the full TH name is "ลา รีไฟน์ โคชิ อะมิโน มอยซ์เจอร์ ล็อค แชมพู"
-    // But we can try to split based on the EN which may have brand + product
-    const enParts = productEn.split(/\s+/)
-    // Heuristic: if the EN has more than 2 words, first 2 might be brand
-    // But safer to use the full name as product name
-    result.productNameTh = productTh
-    result.productNameEn = productEn
-
+    // Physical form + container (often combined in จร)
+    const physicalFormRaw = extractAfter(text, /ลักษณะทางกายภาพของเครื่อง(?:สำอาง|สําอาง)(?:และภาชนะบรรจุ)?\s*[:：]?/i) || ""
     result.physicalForm = parsePhysicalForm(physicalFormRaw || text)
     result.containerType = parseContainerType(physicalFormRaw || text)
 
-    if (/ผลิตภัณฑ์เดี่ยว/.test(productFormat)) result.productFormat = "single"
+    // Product format
+    const productFormatRaw = extractAfter(text, /รูปแบบของเครื่อง(?:สำอาง|สําอาง)\s*[:：]?/i) || ""
+    result.productFormat = productFormatRaw || (/ผลิตภัณฑ์เดี่ยว/.test(text) ? "ผลิตภัณฑ์เดี่ยว" : "")
 
-    // Application area from cosmetic type
-    if (/เส้นผม|หนังศีรษะ/.test(cosmeticType)) result.applicationArea = "เส้นผม/หนังศีรษะ"
-    if (/ใบหน้า|face/i.test(cosmeticType)) result.applicationArea = "ใบหน้า"
+    // Business details
+    const contractorName = extractAfter(text, /ชื่อผู้รับจ้างผลิต\s*[:：]?/i) || ""
+    const manufacturerName = extractAfter(text, /ชื่อผู้ผลิต\s*[:：]?/i) || ""
+    const importerName = extractAfter(text, /ชื่อผู้นำเข้า\s*[:：]?/i) || ""
 
-    // Product purpose from cosmetic type
-    if (/แชมพู/i.test(cosmeticType)) result.productPurpose = "แชมพู"
-    if (/กันแดด/i.test(cosmeticType)) result.productPurpose = "กันแดด"
-    if (/บำรุง/i.test(cosmeticType)) result.productPurpose = "บำรุงผิว"
-
-    // Business type
     if (contractorName) {
       result.businessType = "contract_manufacture"
       result.cm_contractorName = contractorName
-      result.cm_factoryAddress = factoryAddr
-      result.cm_storageAddress = storageAddr
-      result.cm_clientName = clientName
-      result.cm_clientAddress = clientAddr
+      result.cm_factoryAddress = extractBetween(text, /ที่ตั้งสถานที่ผลิต\s*[:：]?/i, /ที่ตั้งสถานที่เก็บ/i) || ""
+      result.cm_storageAddress = extractBetween(text, /ที่ตั้งสถานที่เก็บ\s*[:：]?/i, /ชื่อผู้ว่าจ้าง/i) || ""
+      result.cm_clientName = extractAfter(text, /ชื่อผู้ว่าจ้างผลิต\s*[:：]?/i) || ""
+      result.cm_clientAddress = extractBetween(text, /ที่ตั้งสถานที่ประกอบธุรกิจ\s*[:：]?/i, /เลขที่ใบรับจดแจ้งของ|เงื่อนไข/i) || ""
+    } else if (importerName) {
+      result.businessType = "import_sell"
+      result.imp_importerName = importerName
+      result.imp_importerAddress = extractAfter(text, /ที่ตั้งสถานที่นำเข้า\s*[:：]?/i) || ""
+      result.imp_storageAddress = extractAfter(text, /ที่ตั้งสถานที่เก็บ\s*[:：]?/i) || ""
+      result.imp_foreignManufacturer = extractAfter(text, /ชื่อผู้ผลิตต่างประเทศ\s*[:：]?/i) || ""
+      result.imp_foreignFactory = extractAfter(text, /ที่ตั้งสถานที่ผลิต.*?ต่างประเทศ\s*[:：]?/i) || ""
+      result.imp_country = extractAfter(text, /ประเทศผู้ผลิต\s*[:：]?/i) || ""
+    } else if (manufacturerName) {
+      result.businessType = "manufacture_sell"
+      result.ms_manufacturerName = manufacturerName
+      result.ms_factoryAddress = extractAfter(text, /ที่ตั้งสถานที่ผลิต\s*[:：]?/i) || ""
+      result.ms_storageAddress = extractAfter(text, /ที่ตั้งสถานที่เก็บ\s*[:：]?/i) || ""
     }
+
+    // Bulk / combined reg nos
+    result.bulkRegNo = extractAfter(text, /เลขที่ใบรับจดแจ้งของเครื่อง(?:สำอาง|สําอาง).*?แบ่งบรรจุ\s*[:：]?/i) || ""
+    result.combinedRegNos = extractAfter(text, /เลขที่ใบรับจดแจ้งของเครื่อง(?:สำอาง|สําอาง).*?รวมบรรจุ\s*[:：]?/i) || ""
 
     return result
   }

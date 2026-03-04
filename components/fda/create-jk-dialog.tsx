@@ -136,7 +136,19 @@ export function CreateJkDialog({ open, onOpenChange, initialData }: Props) {
   const handleOpenChange = useCallback((o: boolean) => {
     if (o && initialData) {
       setForm({ ...EMPTY_JK, ...initialData })
-      setStep(initialData.ingredients && initialData.ingredients.length > 1 ? 6 : 0)
+      // Jump to review step if we have enough data from import
+      const hasProduct = !!(initialData.productNameTh || initialData.productNameEn || initialData.tradeNameTh)
+      const hasBiz = !!(initialData.cm_contractorName || initialData.ms_manufacturerName || initialData.imp_importerName)
+      const hasIng = !!(initialData.ingredients && initialData.ingredients.length > 1)
+      if (hasProduct && hasBiz && hasIng) {
+        setStep(6) // review
+      } else if (hasProduct && hasBiz) {
+        setStep(4) // ingredients
+      } else if (hasProduct) {
+        setStep(2) // physical section
+      } else {
+        setStep(0)
+      }
     }
     if (!o) { setStep(0); setForm({ ...EMPTY_JK }); setSelfDeclareChecked(SELF_DECLARE_ITEMS.map(() => false)); setCertChecked(CERT_ITEMS.map(() => false)) }
     onOpenChange(o)
