@@ -1,7 +1,15 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Search, Eye, Pencil, Printer, Flag, MapPin, MoreHorizontal, ArrowUpDown } from "lucide-react"
+import { Search, Eye, Pencil, Printer, Flag, MapPin, MoreHorizontal, ArrowUpDown, Copy, XCircle, Trash2 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,6 +41,7 @@ interface DeliveryTableProps {
 }
 
 export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
+  const { toast } = useToast()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<"deliveryDate" | "totalAmount" | null>(null)
@@ -267,40 +276,58 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
                         >
                           <Eye className="h-3 w-3 text-muted-foreground" />
                         </button>
-                        {row.status === "shipped" && (
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary transition-all hover:border-primary hover:bg-primary/10"
-                            title="Track"
-                          >
-                            <MapPin className="h-3 w-3 text-muted-foreground" />
-                          </button>
-                        )}
-                        {(row.status === "draft" || row.status === "reserved" || row.status === "picking") && (
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary transition-all hover:border-primary hover:bg-primary/10"
-                            title="Edit"
-                          >
-                            <Pencil className="h-3 w-3 text-muted-foreground" />
-                          </button>
-                        )}
-                        {row.jobStatus === "pending_close" && (
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 transition-all hover:bg-emerald-500 hover:text-white"
-                            title="Close Job"
-                          >
-                            <Flag className="h-3 w-3" />
-                          </button>
-                        )}
                         <button
                           type="button"
                           className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary transition-all hover:border-primary hover:bg-primary/10"
                           title="Print"
+                          onClick={() => toast({ title: "Print DO", description: `Printing ${row.deliveryNumber}...` })}
                         >
                           <Printer className="h-3 w-3 text-muted-foreground" />
                         </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary transition-all hover:border-primary hover:bg-primary/10"
+                            >
+                              <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => onRowClick?.(row.id)}>
+                              <Eye className="mr-2 h-3.5 w-3.5" /> View Detail
+                            </DropdownMenuItem>
+                            {(row.status === "draft" || row.status === "reserved" || row.status === "picking") && (
+                              <DropdownMenuItem onClick={() => toast({ title: "Edit", description: `Editing ${row.deliveryNumber}` })}>
+                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => toast({ title: "Duplicated", description: `Cloned ${row.deliveryNumber}` })}>
+                              <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate
+                            </DropdownMenuItem>
+                            {row.status === "shipped" && (
+                              <DropdownMenuItem onClick={() => toast({ title: "Tracking", description: row.trackingNumber || "No tracking yet" })}>
+                                <MapPin className="mr-2 h-3.5 w-3.5" /> Track Shipment
+                              </DropdownMenuItem>
+                            )}
+                            {row.jobStatus === "pending_close" && (
+                              <DropdownMenuItem onClick={() => toast({ title: "Job Closed", description: `Closed job for ${row.deliveryNumber}` })}>
+                                <Flag className="mr-2 h-3.5 w-3.5" /> Close Job
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            {(row.status === "draft" || row.status === "reserved") && (
+                              <DropdownMenuItem className="text-amber-600 focus:text-amber-600" onClick={() => toast({ title: "Cancelled", description: `${row.deliveryNumber} cancelled`, variant: "destructive" })}>
+                                <XCircle className="mr-2 h-3.5 w-3.5" /> Cancel
+                              </DropdownMenuItem>
+                            )}
+                            {row.status === "draft" && (
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => toast({ title: "Deleted", description: `${row.deliveryNumber} deleted`, variant: "destructive" })}>
+                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>

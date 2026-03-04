@@ -2,7 +2,14 @@
 
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
-import { Search, Plus } from "lucide-react"
+import { Search, Plus, MoreHorizontal, Pencil, Star, Archive, Eye } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import type { SupplierListItem, SupplierStatus } from "@/lib/supplier-types"
 import { SUPPLIER_TYPE_MAP, GRADE_MAP } from "@/lib/supplier-types"
@@ -17,6 +24,7 @@ interface SupplierListPanelProps {
 }
 
 export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick }: SupplierListPanelProps) {
+  const { toast } = useToast()
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("active")
 
@@ -108,7 +116,7 @@ export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick 
               key={sup.id}
               onClick={() => onSelect(sup.id)}
               className={cn(
-                "rounded-xl p-3.5 px-4 cursor-pointer transition-all border mb-1",
+                "group rounded-xl p-3.5 px-4 cursor-pointer transition-all border mb-1",
                 isSelected
                   ? "bg-card border-primary shadow-sm border-l-4 border-l-primary"
                   : "border-transparent hover:bg-card hover:border-border"
@@ -118,12 +126,35 @@ export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick 
                 <span className="text-[14px] font-bold text-foreground leading-tight">
                   {flag} {sup.supplierName}
                 </span>
-                <span className={cn(
-                  "rounded-lg px-2 py-0.5 text-[10px] font-extrabold text-card bg-gradient-to-br",
-                  gradeGradient
-                )}>
-                  {sup.grade}
-                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className={cn(
+                    "rounded-lg px-2 py-0.5 text-[10px] font-extrabold text-card bg-gradient-to-br",
+                    gradeGradient
+                  )}>
+                    {sup.grade}
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div role="button" tabIndex={0} className="flex h-6 w-6 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10" onClick={(e) => e.stopPropagation()}>
+                        <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(sup.id) }}>
+                        <Eye className="mr-2 h-3.5 w-3.5" /> View Detail
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast({ title: "Edit Supplier", description: sup.supplierName }) }}>
+                        <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast({ title: "Rate Supplier", description: `Rating ${sup.supplierName}` }) }}>
+                        <Star className="mr-2 h-3.5 w-3.5" /> Rate Supplier
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-amber-600 focus:text-amber-600" onClick={(e) => { e.stopPropagation(); toast({ title: "Archived", description: `${sup.supplierName} archived` }) }}>
+                        <Archive className="mr-2 h-3.5 w-3.5" /> Archive
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               <div className="text-[11px] text-muted-foreground mt-0.5">

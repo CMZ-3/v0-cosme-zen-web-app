@@ -2,7 +2,14 @@
 
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
-import { Search, Plus, Building, User } from "lucide-react"
+import { Search, Plus, Building, User, MoreHorizontal, Pencil, Archive, Eye } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import type { CustomerListItem, CustomerTier } from "@/lib/customer-types"
 import { TIER_MAP, BUSINESS_TYPE_MAP } from "@/lib/customer-types"
@@ -17,6 +24,7 @@ interface CustomerListPanelProps {
 }
 
 export function CustomerListPanel({ customers, selectedId, onSelect, onNewClick }: CustomerListPanelProps) {
+  const { toast } = useToast()
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("all")
 
@@ -111,7 +119,7 @@ export function CustomerListPanel({ customers, selectedId, onSelect, onNewClick 
                   : "border-transparent bg-transparent hover:bg-card hover:border-border hover:shadow-sm"
               )}
             >
-              {/* Row 1 -- Name + Tier Badge */}
+              {/* Row 1 -- Name + Tier Badge + Actions */}
               <div className="flex items-start justify-between gap-2 mb-1.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className={cn(
@@ -129,9 +137,29 @@ export function CustomerListPanel({ customers, selectedId, onSelect, onNewClick 
                     <p className="text-[10px] text-muted-foreground font-mono">{c.customerCode}</p>
                   </div>
                 </div>
-                <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold border", tierInfo.color, tierInfo.bg, tierInfo.border)}>
-                  {tierInfo.label}
-                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className={cn("rounded-full px-2 py-0.5 text-[9px] font-bold border", tierInfo.color, tierInfo.bg, tierInfo.border)}>
+                    {tierInfo.label}
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div role="button" tabIndex={0} className="flex h-6 w-6 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10" onClick={(e) => e.stopPropagation()}>
+                        <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(c.id) }}>
+                        <Eye className="mr-2 h-3.5 w-3.5" /> View
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast({ title: "Edit Customer", description: c.customerName }) }}>
+                        <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-amber-600 focus:text-amber-600" onClick={(e) => { e.stopPropagation(); toast({ title: "Archived", description: `${c.customerName} archived` }) }}>
+                        <Archive className="mr-2 h-3.5 w-3.5" /> Archive
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               {/* Row 2 -- Stats */}

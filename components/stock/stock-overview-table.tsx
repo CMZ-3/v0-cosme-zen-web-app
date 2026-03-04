@@ -2,7 +2,15 @@
 
 import { useState, useMemo } from "react"
 import Link from "next/link"
-import { Search, ExternalLink } from "lucide-react"
+import { Search, ExternalLink, MoreHorizontal, PackagePlus, ArrowLeftRight, Tags, Eye } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,6 +29,7 @@ interface StockOverviewTableProps {
 }
 
 export function StockOverviewTable({ data }: StockOverviewTableProps) {
+  const { toast } = useToast()
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -155,11 +164,39 @@ export function StockOverviewTable({ data }: StockOverviewTableProps) {
                     </Badge>
                   </td>
                   <td className="px-4 py-3.5 text-center">
-                    <Button variant="ghost" size="sm" className="h-7 gap-1 rounded-lg text-[11px] text-primary hover:text-primary" asChild>
-                      <Link href={`/stock/${card.id}`}>
-                        Detail <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    </Button>
+                    <div className="flex items-center justify-center gap-1">
+                      <Button variant="ghost" size="sm" className="h-7 gap-1 rounded-lg text-[11px] text-primary hover:text-primary" asChild>
+                        <Link href={`/stock/${card.id}`}>
+                          Detail <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary transition-all hover:border-primary hover:bg-primary/10">
+                            <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/stock/${card.id}`}><Eye className="mr-2 h-3.5 w-3.5" /> View Detail</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => toast({ title: "Receive Stock", description: `Adding stock for ${card.itemCode}` })}>
+                            <PackagePlus className="mr-2 h-3.5 w-3.5" /> Receive (Buy In)
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => toast({ title: "Issue Stock", description: `Issuing stock from ${card.itemCode}` })}>
+                            <PackagePlus className="mr-2 h-3.5 w-3.5 rotate-180" /> Issue (Out)
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => toast({ title: "Transfer", description: `Transfer ${card.itemCode} between locations` })}>
+                            <ArrowLeftRight className="mr-2 h-3.5 w-3.5" /> Transfer
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => toast({ title: "Print Label", description: `Printing label for ${card.itemCode}` })}>
+                            <Tags className="mr-2 h-3.5 w-3.5" /> Print Label
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </td>
                 </tr>
               ))
