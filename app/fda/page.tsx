@@ -13,7 +13,8 @@ import { CreateJkDialog } from "@/components/fda/create-jk-dialog"
 import { CreateJrDialog } from "@/components/fda/create-jr-dialog"
 import type { JkFormData } from "@/components/fda/create-jk-dialog"
 import type { JrFormData } from "@/components/fda/create-jr-dialog"
-import { ImportPdfDialog } from "@/components/fda/import-pdf-dialog"
+import { ImportJkDialog } from "@/components/fda/import-jk-dialog"
+import { ImportJrDialog } from "@/components/fda/import-jr-dialog"
 import { mockFdaKPI, mockFdaList } from "@/lib/fda-mock-data"
 import type { RegistrationType } from "@/lib/fda-types"
 import { cn } from "@/lib/utils"
@@ -40,8 +41,10 @@ export default function FdaPage() {
   const [jkInitialData, setJkInitialData] = useState<Partial<JkFormData> | undefined>(undefined)
   const [jrInitialData, setJrInitialData] = useState<Partial<JrFormData> | undefined>(undefined)
 
-  // Import dialog
-  const [importOpen, setImportOpen] = useState(false)
+  // Import dialogs (separate for JK / JR)
+  const [importPickerOpen, setImportPickerOpen] = useState(false)
+  const [importJkOpen, setImportJkOpen] = useState(false)
+  const [importJrOpen, setImportJrOpen] = useState(false)
 
   const openJk = useCallback((data?: Partial<JkFormData>) => {
     setJkInitialData(data)
@@ -63,79 +66,14 @@ export default function FdaPage() {
     if (!o) setJrInitialData(undefined)
   }, [])
 
-  // Import complete handler: routes to the correct form based on detected type
-  const handleImportComplete = useCallback((data: Record<string, unknown>) => {
-    const s = (k: string) => (data[k] as string) || ""
-    const regType = s("regType")
+  // Import complete handlers (typed, no generic mapping needed)
+  const handleImportJkComplete = useCallback((data: Partial<JkFormData>) => {
+    openJk(data)
+  }, [openJk])
 
-    if (regType === "jr") {
-      const jrData: Partial<JrFormData> = {
-        regNumber: s("regNumber"),
-        issueDate: s("issueDate"),
-        expiryDate: s("expiryDate"),
-        issuedBy: s("issuedBy"),
-        productNameTh: s("productNameTh"),
-        productNameEn: s("productNameEn"),
-        productNameSuffix: s("productNameSuffix"),
-        cosmeticType: s("cosmeticType"),
-        physicalForm: s("physicalForm"),
-        containerType: s("containerType"),
-        productFormat: s("productFormat"),
-        businessType: (data.businessType as JrFormData["businessType"]) || "contract_manufacture",
-        ms_manufacturerName: s("ms_manufacturerName"),
-        ms_factoryAddress: s("ms_factoryAddress"),
-        ms_storageAddress: s("ms_storageAddress"),
-        cm_contractorName: s("cm_contractorName"),
-        cm_factoryAddress: s("cm_factoryAddress"),
-        cm_storageAddress: s("cm_storageAddress"),
-        cm_clientName: s("cm_clientName"),
-        cm_clientAddress: s("cm_clientAddress"),
-        imp_importerName: s("imp_importerName"),
-        imp_importerAddress: s("imp_importerAddress"),
-        imp_storageAddress: s("imp_storageAddress"),
-        imp_foreignManufacturer: s("imp_foreignManufacturer"),
-        imp_foreignFactory: s("imp_foreignFactory"),
-        imp_country: s("imp_country"),
-        bulkRegNo: s("bulkRegNo"),
-        combinedRegNos: s("combinedRegNos"),
-      }
-      openJr(jrData)
-    } else {
-      const jkData: Partial<JkFormData> = {
-        purpose: (data.purpose as JkFormData["purpose"]) || "domestic",
-        tradeNameTh: s("tradeNameTh"),
-        tradeNameEn: s("tradeNameEn"),
-        productNameTh: s("productNameTh"),
-        productNameEn: s("productNameEn"),
-        usageFormat: (data.usageFormat as JkFormData["usageFormat"]) || "",
-        applicationArea: s("applicationArea"),
-        productPurpose: s("productPurpose"),
-        usageInstructions: s("usageInstructions"),
-        physicalForm: s("physicalForm"),
-        containerType: s("containerType"),
-        productFormat: (data.productFormat as JkFormData["productFormat"]) || "",
-        businessType: (data.businessType as JkFormData["businessType"]) || "contract_manufacture",
-        cm_contractorName: s("cm_contractorName"),
-        cm_contractorOffice: s("cm_contractorOffice"),
-        cm_factoryAddress: s("cm_factoryAddress"),
-        cm_storageAddress: s("cm_storageAddress"),
-        cm_clientName: s("cm_clientName"),
-        cm_clientAddress: s("cm_clientAddress"),
-        ms_manufacturerName: s("ms_manufacturerName"),
-        ms_officeAddress: s("ms_officeAddress"),
-        ms_factoryAddress: s("ms_factoryAddress"),
-        ms_storageAddress: s("ms_storageAddress"),
-        imp_importerName: s("imp_importerName"),
-        imp_importerAddress: s("imp_importerAddress"),
-        imp_storageAddress: s("imp_storageAddress"),
-        imp_foreignManufacturer: s("imp_foreignManufacturer"),
-        imp_foreignFactory: s("imp_foreignFactory"),
-        imp_country: s("imp_country"),
-        ingredients: (data.ingredients as JkFormData["ingredients"]) || [{ no: 1, casNumber: "", inciName: "" }],
-      }
-      openJk(jkData)
-    }
-  }, [openJk, openJr])
+  const handleImportJrComplete = useCallback((data: Partial<JrFormData>) => {
+    openJr(data)
+  }, [openJr])
 
   const filteredList = useMemo(() => {
     if (typeFilter === "all") return mockFdaList
@@ -158,7 +96,7 @@ export default function FdaPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 rounded-xl text-[11px] font-semibold" onClick={() => setImportOpen(true)}>
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-xl text-[11px] font-semibold" onClick={() => setImportPickerOpen(true)}>
             <FileUp className="h-3.5 w-3.5" />
             Import PDF
           </Button>
@@ -274,8 +212,54 @@ export default function FdaPage() {
       <CreateJkDialog open={jkOpen} onOpenChange={handleJkClose} initialData={jkInitialData} />
       <CreateJrDialog open={jrOpen} onOpenChange={handleJrClose} initialData={jrInitialData} />
 
-      {/* ───── Import PDF Dialog ───── */}
-      <ImportPdfDialog open={importOpen} onOpenChange={setImportOpen} onImportComplete={handleImportComplete} />
+      {/* ───── Import Type Picker Dialog ───── */}
+      <Dialog open={importPickerOpen} onOpenChange={setImportPickerOpen}>
+        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b border-border">
+            <DialogTitle className="text-lg font-extrabold flex items-center gap-2">
+              <FileUp className="h-5 w-5 text-primary" />
+              {"Import PDF"}
+            </DialogTitle>
+            <p className="text-[11px] text-muted-foreground">{"เลือกประเภทเอกสารที่ต้องการ Import"}</p>
+          </DialogHeader>
+          <div className="p-6 flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => { setImportPickerOpen(false); setImportJkOpen(true) }}
+              className="flex items-start gap-4 rounded-xl border-2 border-blue-200 bg-blue-50/30 hover:bg-blue-50 px-5 py-4 text-left transition-all hover:border-blue-400"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 shrink-0 mt-0.5">
+                <FileText className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-base font-extrabold text-blue-800">{"Import จ.ค.๑"}</p>
+                <p className="text-[12px] font-semibold text-blue-600">{"คำขอจดแจ้งเครื่องสำอาง"}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{"อัปโหลด PDF แบบ จ.ค.๑ แล้วระบบจะดึงข้อมูลทุก field อัตโนมัติ"}</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setImportPickerOpen(false); setImportJrOpen(true) }}
+              className="flex items-start gap-4 rounded-xl border-2 border-amber-200 bg-amber-50/30 hover:bg-amber-50 px-5 py-4 text-left transition-all hover:border-amber-400"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 shrink-0 mt-0.5">
+                <FileCheck className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-base font-extrabold text-amber-800">{"Import จ.ร.๑"}</p>
+                <p className="text-[12px] font-semibold text-amber-600">{"ใบรับจดแจ้งเครื่องสำอาง"}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{"อัปโหลด PDF แบบ จ.ร.๑ แล้วระบบจะดึงเลขที่ วันที่ ข้อมูลผลิตภัณฑ์อัตโนมัติ"}</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ───── Import JK Dialog ───── */}
+      <ImportJkDialog open={importJkOpen} onOpenChange={setImportJkOpen} onImportComplete={handleImportJkComplete} />
+
+      {/* ───── Import JR Dialog ───── */}
+      <ImportJrDialog open={importJrOpen} onOpenChange={setImportJrOpen} onImportComplete={handleImportJrComplete} />
     </div>
   )
 }
