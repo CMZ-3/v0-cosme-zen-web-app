@@ -17,6 +17,7 @@ import { mockStockMovements } from "@/lib/stock-mock-data"
 import { mockFormulaList } from "@/lib/formula-mock-data"
 import { useMemo } from "react"
 
+
 const statusLabelMap: Record<string, string> = {
   new: "Created", confirmed: "Confirmed", material_prep: "Material Prep",
   mixing: "Mixing", filling: "Filling", labeling: "Labeling",
