@@ -20,6 +20,7 @@ import {
   mockTrialBatches, mockApprovalSteps, mockStabilityTests,
 } from "@/lib/formula-mock-data"
 import { formulaStatusLabel, formulaStatusColor, formulaTypeLabel, phaseBadgeColor } from "@/lib/formula-types"
+import { toast } from "sonner"
 
 export default function FormulaDetailPage() {
   const params = useParams()
@@ -71,31 +72,31 @@ export default function FormulaDetailPage() {
           <div className="flex items-center gap-1.5 shrink-0">
             {/* Status action buttons */}
             {formula.status === "draft" && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-blue-600 border-blue-200 hover:bg-blue-50">
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => toast.success(`Formula ${formula.formulaCode} approved`)}>
                 <CheckCircle className="h-3.5 w-3.5" /> Approve
               </Button>
             )}
             {formula.status === "approved" && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-emerald-600 border-emerald-200 hover:bg-emerald-50">
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => toast.success(`Formula ${formula.formulaCode} activated`)}>
                 <Zap className="h-3.5 w-3.5" /> Activate
               </Button>
             )}
             {formula.status === "active" && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-muted-foreground">
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-muted-foreground" onClick={() => toast.info(`Formula ${formula.formulaCode} archived`)}>
                 <Archive className="h-3.5 w-3.5" /> Archive
               </Button>
             )}
             {["approved", "active", "archived"].includes(formula.status) && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-amber-600 border-amber-200 hover:bg-amber-50">
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => toast.warning(`Formula ${formula.formulaCode} reverted to draft`)}>
                 <Undo2 className="h-3.5 w-3.5" /> Revert
               </Button>
             )}
             {isDraft && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl">
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl" onClick={() => toast.info(`Editing formula ${formula.formulaCode}`)}>
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </Button>
             )}
-            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl">
+            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl" onClick={() => toast.success(`Formula ${formula.formulaCode} cloned`)}>
               <Copy className="h-3.5 w-3.5" /> Clone
             </Button>
             {isDraft && (

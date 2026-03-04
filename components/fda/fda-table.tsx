@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Search, Eye, Pencil, Trash2, FileText, MoreHorizontal, CalendarClock, Factory, FlaskConical, X } from "lucide-react"
+import { Search, Eye, Pencil, Trash2, FileText, MoreHorizontal, CalendarClock, Factory, FlaskConical, X, Download, ChevronLeft, ChevronRight, Send, Copy } from "lucide-react"
+import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -31,10 +32,13 @@ const extraFilters = [
   { label: "ส่วนผสม", icon: FlaskConical },
 ]
 
+const PAGE_SIZE = 15
+
 export function FdaTable({ data, onRowClick }: FdaTableProps) {
   const [search, setSearch] = useState("")
   const [activeStatus, setActiveStatus] = useState<FdaStatus | "all">("all")
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [page, setPage] = useState(1)
 
   const filtered = useMemo(() => {
     let list = data
@@ -55,6 +59,9 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
     }
     return list
   }, [data, search, activeStatus])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: data.length }
@@ -171,7 +178,7 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 ? (
+            {paged.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={11} className="py-16 text-center">
                   <div className="flex flex-col items-center gap-2">
@@ -182,7 +189,7 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((row) => {
+              paged.map((row) => {
                 const typeCfg = REGISTRATION_TYPE_MAP[row.registrationType]
                 const statusCfg = FDA_STATUS_MAP[row.status]
                 return (
@@ -277,32 +284,32 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
                         </Button>
                         {row.status === "draft" && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => toast.info(`Editing ${row.registrationCode}`)}>
                               <Pencil className="h-3.5 w-3.5 text-primary" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => toast.error(`Deleted ${row.registrationCode}`)}>
                               <Trash2 className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           </>
                         )}
                         {row.status === "approved" && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => toast.success(`Downloading certificate for ${row.registrationCode}`)}>
                             <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         )}
                         {row.status === "submitted" && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => toast.success(`Approved ${row.registrationCode}`)}>
                               <FileText className="h-3.5 w-3.5 text-[#10b981]" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => toast.error(`Rejected ${row.registrationCode}`)}>
                               <X className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           </>
                         )}
                         {(row.status === "expired" || row.status === "rejected") && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
-                            <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => toast.info(`Renewing ${row.registrationCode}`)}>
+                            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         )}
                       </div>
@@ -314,6 +321,57 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
           </TableBody>
         </Table>
       </div>
+      </div>
+
+      {/* Pagination Footer */}
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[12px] text-muted-foreground">
+          Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}-{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} registrations
+        </span>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </Button>
+          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPage(p)}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-semibold transition-all",
+                p === page ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-secondary"
+              )}
+            >
+              {p}
+            </button>
+          ))}
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Floating Bulk Action Bar */}
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 shadow-xl">
+          <span className="text-[12px] font-bold text-foreground">
+            {selected.size} selected
+          </span>
+          <div className="h-5 w-px bg-border" />
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Exporting ${selected.size} registrations...`)}>
+            <Download className="h-3 w-3" /> Export
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.info(`Submitting ${selected.size} registrations...`)}>
+            <Send className="h-3 w-3" /> Submit All
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { toast.error(`Deleted ${selected.size} registrations`); setSelected(new Set()) }}>
+            <Trash2 className="h-3 w-3" /> Delete
+          </Button>
+          <button type="button" className="ml-1 flex h-6 w-6 items-center justify-center rounded-full hover:bg-secondary" onClick={() => setSelected(new Set())}>
+            <X className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

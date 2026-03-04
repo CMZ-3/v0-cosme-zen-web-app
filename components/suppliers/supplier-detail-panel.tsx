@@ -10,6 +10,7 @@ import {
   User, Building, Star, CheckCircle, AlertTriangle, XCircle, Plus
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 
 type TabKey = "products" | "overview" | "catalog" | "coa" | "orders" | "performance" | "documents"
 
@@ -134,8 +135,16 @@ export function SupplierDetailPanel({ detail, supplierName }: SupplierDetailPane
             </div>
           </div>
 
-          {/* Right: Scores + Trade */}
-          <div className="flex gap-3.5 flex-shrink-0">
+          {/* Right: Actions + Scores + Trade */}
+          <div className="flex gap-3.5 flex-shrink-0 items-start">
+            <div className="flex flex-col gap-1.5 pt-1">
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5 w-full justify-start" onClick={() => toast.info(`Editing ${detail.supplierName}`)}>
+                <Building className="h-3 w-3" /> Edit
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5 w-full justify-start" onClick={() => toast.success(`Exporting ${detail.supplierCode} to PDF...`)}>
+                <Download className="h-3 w-3" /> Export
+              </Button>
+            </div>
             <ScoreRing value={avgRating} max={5} color="#10b981" label="Rating" />
             <ScoreRing value={`${detail.onTimeDeliveryPct ?? 0}%`} max={100} color="#4c8bf5" label="On-Time" />
             <TradeCard

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Search, Eye, Pencil, Printer, Flag, MapPin, MoreHorizontal, ArrowUpDown, Copy, XCircle, Trash2 } from "lucide-react"
+import { Search, Eye, Pencil, Printer, Flag, MapPin, MoreHorizontal, ArrowUpDown, Copy, XCircle, Trash2, Truck } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,9 +40,12 @@ interface DeliveryTableProps {
   onRowClick?: (id: string) => void
 }
 
+const DELIVERY_PAGE_SIZE = 15
+
 export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
   const { toast } = useToast()
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<"deliveryDate" | "totalAmount" | null>(null)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
@@ -84,6 +87,9 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
 
     return result
   }, [data, search, statusFilter, sortField, sortDir])
+
+  const deliveryTotalPages = Math.max(1, Math.ceil(filtered.length / DELIVERY_PAGE_SIZE))
+  const paged = filtered.slice((page - 1) * DELIVERY_PAGE_SIZE, page * DELIVERY_PAGE_SIZE)
 
   const handleSort = (field: "deliveryDate" | "totalAmount") => {
     if (sortField === field) {
@@ -170,7 +176,7 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((row) => {
+              {paged.map((row) => {
                 const statusInfo = deliveryStatusMap[row.status]
                 const avatarColor = customerAvatarColors[row.customerName] || "from-gray-400 to-gray-600"
                 const overdue = isOverdue(row.deliveryDate, row.status)
@@ -333,10 +339,14 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
                   </TableRow>
                 )
               })}
-              {filtered.length === 0 && (
+              {paged.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} className="py-12 text-center text-sm text-muted-foreground">
-                    No delivery orders found
+                  <TableCell colSpan={11} className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <Truck className="h-8 w-8 text-muted-foreground/30" />
+                      <p className="text-sm font-semibold text-muted-foreground">No delivery orders found</p>
+                      <p className="text-[11px] text-muted-foreground/70">{search ? `No results for "${search}"` : "Try changing your filters"}</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
@@ -347,21 +357,38 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-border px-5 py-3">
           <span className="text-[12px] text-muted-foreground">
-            Showing {filtered.length} of {data.length} orders
+            Showing {Math.min((page - 1) * DELIVERY_PAGE_SIZE + 1, filtered.length)}-{Math.min(page * DELIVERY_PAGE_SIZE, filtered.length)} of {filtered.length} orders
           </span>
           <div className="flex gap-1">
-            {[1, 2, 3].map((p) => (
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary disabled:opacity-30"
+            >
+              <ArrowUpDown className="h-3 w-3 rotate-180" />
+            </button>
+            {Array.from({ length: Math.min(deliveryTotalPages, 5) }, (_, i) => i + 1).map((p) => (
               <button
                 key={p}
                 type="button"
+                onClick={() => setPage(p)}
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-semibold transition-all",
-                  p === 1 ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-secondary"
+                  p === page ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-secondary"
                 )}
               >
                 {p}
               </button>
             ))}
+            <button
+              type="button"
+              disabled={page >= deliveryTotalPages}
+              onClick={() => setPage(page + 1)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary disabled:opacity-30"
+            >
+              <ArrowUpDown className="h-3 w-3" />
+            </button>
           </div>
         </div>
       </div>

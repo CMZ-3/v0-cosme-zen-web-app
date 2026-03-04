@@ -2,7 +2,15 @@
 
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
-import { Printer, Download, Pencil, FlaskConical, User, Package, DollarSign, Clock, Check } from "lucide-react"
+import { Printer, Download, Pencil, FlaskConical, User, Package, DollarSign, Clock, Check, MoreHorizontal, Copy, Ban } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import type { JobOrder, TrackingStats } from "@/lib/job-order-types"
 import { JO_STATUS_MAP } from "@/lib/job-order-types"
@@ -54,9 +62,33 @@ export function JobOrderDetail({ jobOrder }: Props) {
             </div>
           </div>
           <div className="flex shrink-0 items-start gap-2">
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[11px]"><Printer className="h-3.5 w-3.5" /> Print</Button>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[11px]"><Download className="h-3.5 w-3.5" /> Export</Button>
-            <Button size="sm" className="h-8 gap-1.5 text-[11px]"><Pencil className="h-3.5 w-3.5" /> Edit</Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[11px]" onClick={() => toast.success(`Printing JO #${jobOrder.orderNumber}...`)}>
+              <Printer className="h-3.5 w-3.5" /> Print
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[11px]" onClick={() => toast.success(`Exporting JO #${jobOrder.orderNumber} to PDF...`)}>
+              <Download className="h-3.5 w-3.5" /> Export
+            </Button>
+            <Button size="sm" className="h-8 gap-1.5 text-[11px]" onClick={() => toast.info(`Editing JO #${jobOrder.orderNumber}`)}>
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => toast.info(`Duplicating JO #${jobOrder.orderNumber}`)}>
+                  <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate JO
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {jobOrder.status !== "completed" && jobOrder.status !== "cancelled" && (
+                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => toast.error(`JO #${jobOrder.orderNumber} cancelled`)}>
+                    <Ban className="mr-2 h-3.5 w-3.5" /> Cancel JO
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

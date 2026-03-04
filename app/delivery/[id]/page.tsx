@@ -47,6 +47,7 @@ import {
   customerAvatarColors,
 } from "@/lib/delivery-mock-data"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 export default function DeliveryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -108,6 +109,7 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
             variant={a.variant}
             size="sm"
             className={cn("gap-1.5 rounded-[10px] text-[12px] font-semibold", a.variant === "default" && a.color && `${a.color} text-white`)}
+            onClick={() => toast.success(`${a.label}: ${order.deliveryNumber}`)}
           >
             <a.icon className="h-3.5 w-3.5" />
             {a.label}
@@ -167,11 +169,11 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
             {renderStatusActions()}
             <div className="flex gap-2">
               {(order.status === "draft" || order.status === "reserved") && (
-                <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]">
+                <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]" onClick={() => toast.info(`Editing ${order.deliveryNumber}`)}>
                   <Pencil className="h-3 w-3" /> Edit
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]">
+              <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]" onClick={() => toast.success(`Printing ${order.deliveryNumber}...`)}>
                 <Printer className="h-3 w-3" /> Print DO
               </Button>
             </div>

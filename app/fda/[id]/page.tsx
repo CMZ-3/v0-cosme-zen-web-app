@@ -66,7 +66,7 @@ export default function FdaDetailPage() {
           <div className="flex items-center gap-2 shrink-0">
             <FdaStatusActions registration={data} />
             {isDraft && (
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => toast.info(`Editing ${data.registrationCode}`)}>
                 <Pencil className="h-3 w-3" /> Edit
               </Button>
             )}

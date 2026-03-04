@@ -147,10 +147,14 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
 
         {/* Footer Actions */}
         <div className="shrink-0 flex items-center gap-2 border-t border-border px-5 py-3">
-          <Button variant="outline" size="sm" className="gap-1.5 rounded-[10px] text-[11px] font-semibold">
-            <Printer className="h-3.5 w-3.5" />
-            Print
-          </Button>
+  <Button variant="outline" size="sm" className="gap-1.5 rounded-[10px] text-[11px] font-semibold" onClick={() => toast.success(`Printing ${product.sku}...`)}>
+<Printer className="h-3.5 w-3.5" />
+Print
+</Button>
+<Button size="sm" className="gap-1.5 rounded-[10px] bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-[#3b6fd4]" onClick={() => toast.info(`Editing ${product.nameInternal}`)}>
+<Edit className="h-3.5 w-3.5" />
+Edit Product
+</Button>
           <div className="flex-1" />
           <Button size="sm" className="gap-1.5 rounded-[10px] bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-[#3b6fd4]">
             <Edit className="h-3.5 w-3.5" />

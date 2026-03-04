@@ -16,6 +16,7 @@ import {
   Pencil, CheckCircle, XCircle, CalendarDays,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 
 type TabKey = "overview" | "contacts" | "addresses" | "brands" | "documents" | "contracts" | "briefs" | "complaints" | "contact-logs" | "fda" | "lots"
 
@@ -103,9 +104,10 @@ export function CustomerDetailPanel({ detail, customerName }: CustomerDetailPane
 
           {/* Right -- Credit Meter + Actions */}
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5"><Pencil className="h-3 w-3" /> Edit</Button>
-            </div>
+  <div className="flex items-center gap-2">
+<Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5" onClick={() => toast.info(`Editing ${detail.customerName}`)}><Pencil className="h-3 w-3" /> Edit</Button>
+<Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5" onClick={() => toast.success(`Exporting ${detail.customerCode} to PDF...`)}><Download className="h-3 w-3" /> Export</Button>
+  </div>
             {detail.creditLimit && (
               <div className="w-[160px]">
                 <div className="flex items-center justify-between text-[10px] mb-1">

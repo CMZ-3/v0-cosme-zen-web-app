@@ -7,8 +7,9 @@ import {
   ArrowLeft, ChevronRight, Pencil, Package, MapPin, Thermometer,
   Barcode, FlaskConical, ClipboardList, Lock, Layers, AlertTriangle,
   TrendingUp, TrendingDown, ArrowDownToLine, DollarSign, Calendar,
-  FileText, ExternalLink,
+  FileText, ExternalLink, PackagePlus, ArrowLeftRight, Tags, Printer,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -71,9 +72,23 @@ export default function StockDetailPage() {
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">{card.itemName}</p>
           </div>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]">
-            <Pencil className="h-3 w-3" /> Edit
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Receive stock for ${card.itemCode}`)}>
+              <PackagePlus className="h-3 w-3" /> Receive
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Issue stock from ${card.itemCode}`)}>
+              <ArrowDownToLine className="h-3 w-3" /> Issue
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.info(`Transfer ${card.itemCode}`)}>
+              <ArrowLeftRight className="h-3 w-3" /> Transfer
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Printing label for ${card.itemCode}`)}>
+              <Tags className="h-3 w-3" /> Label
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.info(`Editing ${card.itemCode}`)}>
+              <Pencil className="h-3 w-3" /> Edit
+            </Button>
+          </div>
         </div>
 
         {/* Quick Stats */}
