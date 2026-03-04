@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   PanelLeftClose,
   PanelLeft,
+  ArrowLeftRight,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -27,6 +28,7 @@ const menuItems: { label: string; icon: typeof LayoutDashboard; href: string; ba
   { label: "Job Orders", icon: ClipboardList, href: "/job-orders", badge: 5 },
   { label: "Products", icon: ShoppingBag, href: "/products" },
   { label: "Stock v3", icon: Package, href: "/stock" },
+  { label: "Movements", icon: ArrowLeftRight, href: "/stock/movements" },
   { label: "Formulas", icon: FlaskConical, href: "/formulas" },
   { label: "Production", icon: Factory, href: "/production" },
   { label: "Customers", icon: Users, href: "/customers" },
