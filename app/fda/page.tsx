@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { FdaKpiCards } from "@/components/fda/fda-kpi-cards"
 import { FdaTable } from "@/components/fda/fda-table"
 import { CreateFdaDialog } from "@/components/fda/create-fda-dialog"
+import type { FdaFormData } from "@/components/fda/create-fda-dialog"
+import { ImportPdfDialog } from "@/components/fda/import-pdf-dialog"
 import { mockFdaKPI, mockFdaList } from "@/lib/fda-mock-data"
 import type { RegistrationType } from "@/lib/fda-types"
 import { cn } from "@/lib/utils"
@@ -22,8 +24,20 @@ const pageTabs: { value: PageTab; label: string; icon: typeof LayoutList }[] = [
 export default function FdaPage() {
   const router = useRouter()
   const [createOpen, setCreateOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importedData, setImportedData] = useState<Partial<FdaFormData> | undefined>(undefined)
   const [activeTab, setActiveTab] = useState<PageTab>("list")
   const [typeFilter, setTypeFilter] = useState<RegistrationType | "all">("all")
+
+  const handleImportComplete = (data: Partial<FdaFormData>) => {
+    setImportedData(data)
+    setCreateOpen(true)
+  }
+
+  const handleCreateOpenChange = (open: boolean) => {
+    setCreateOpen(open)
+    if (!open) setImportedData(undefined)
+  }
 
   const filteredList = useMemo(() => {
     if (typeFilter === "all") return mockFdaList
@@ -46,7 +60,7 @@ export default function FdaPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 rounded-xl text-[11px] font-semibold">
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-xl text-[11px] font-semibold" onClick={() => setImportOpen(true)}>
             <FileUp className="h-3.5 w-3.5" />
             Import PDF
           </Button>
@@ -58,7 +72,7 @@ export default function FdaPage() {
             <Download className="h-3.5 w-3.5" />
             Export
           </Button>
-          <Button size="sm" className="gap-1.5 rounded-xl bg-[#10b981] hover:bg-[#059669] text-white text-[11px] font-bold shadow-[0_2px_8px_rgba(16,185,129,0.3)]" onClick={() => setCreateOpen(true)}>
+          <Button size="sm" className="gap-1.5 rounded-xl bg-[#10b981] hover:bg-[#059669] text-white text-[11px] font-bold shadow-[0_2px_8px_rgba(16,185,129,0.3)]" onClick={() => { setImportedData(undefined); setCreateOpen(true) }}>
             <Plus className="h-4 w-4" />
             {"สร้างทะเบียน"}
           </Button>
@@ -146,7 +160,10 @@ export default function FdaPage() {
       )}
 
       {/* Create Dialog */}
-      <CreateFdaDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateFdaDialog open={createOpen} onOpenChange={handleCreateOpenChange} initialData={importedData} />
+
+      {/* Import PDF Dialog */}
+      <ImportPdfDialog open={importOpen} onOpenChange={setImportOpen} onImportComplete={handleImportComplete} />
     </div>
   )
 }
