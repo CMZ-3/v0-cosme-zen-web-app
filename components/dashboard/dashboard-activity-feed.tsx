@@ -14,7 +14,7 @@ import { mockJobOrders } from "@/lib/job-order-mock-data"
 import { mockDeliveryOrders } from "@/lib/delivery-mock-data"
 import { mockFdaList } from "@/lib/fda-mock-data"
 import { mockStockMovements } from "@/lib/stock-mock-data"
-import { mockFormulas } from "@/lib/formula-mock-data"
+import { mockFormulaList } from "@/lib/formula-mock-data"
 import { useMemo } from "react"
 
 const statusLabelMap: Record<string, string> = {
@@ -107,7 +107,7 @@ export function DashboardActivityFeed() {
     })
 
     // Formulas
-    mockFormulas.slice(0, 3).forEach(f => {
+    mockFormulaList.slice(0, 3).forEach(f => {
       items.push({
         id: `fml-${f.id}`,
         icon: FlaskConical,
