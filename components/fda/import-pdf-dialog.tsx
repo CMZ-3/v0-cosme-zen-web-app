@@ -23,12 +23,14 @@ import {
   Eye,
 } from "lucide-react"
 import { parseFdaPdfText } from "@/lib/fda-pdf-parser"
-import type { FdaFormData } from "@/components/fda/create-fda-dialog"
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ParsedData = Record<string, any>
 
 interface ImportPdfDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onImportComplete: (data: Partial<FdaFormData>) => void
+  onImportComplete: (data: ParsedData) => void
 }
 
 type ImportPhase = "upload" | "extracting" | "preview" | "error"
@@ -43,7 +45,7 @@ export function ImportPdfDialog({ open, onOpenChange, onImportComplete }: Import
   const [phase, setPhase] = useState<ImportPhase>("upload")
   const [fileName, setFileName] = useState("")
   const [rawText, setRawText] = useState("")
-  const [parsedData, setParsedData] = useState<Partial<FdaFormData> | null>(null)
+  const [parsedData, setParsedData] = useState<ParsedData | null>(null)
   const [extractedFields, setExtractedFields] = useState<ExtractedField[]>([])
   const [showRawText, setShowRawText] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -218,7 +220,12 @@ export function ImportPdfDialog({ open, onOpenChange, onImportComplete }: Import
                   <p className="text-[12px] font-bold text-[#10b981]">{"ดึงข้อมูลสำเร็จ"}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{fileName}</p>
                 </div>
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-card border border-border">
+                {parsedData?.regType && (
+                <div className={cn("flex items-center gap-1 px-2.5 py-1 rounded-lg border", parsedData.regType === "jk" ? "bg-blue-50 border-blue-200" : "bg-amber-50 border-amber-200")}>
+                  <span className={cn("text-xs font-extrabold", parsedData.regType === "jk" ? "text-blue-700" : "text-amber-700")}>{parsedData.regType === "jk" ? "จ.ค.๑" : "จ.ร.๑"}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-card border border-border">
                   <span className="text-lg font-extrabold text-foreground">{extractedFields.length}</span>
                   <span className="text-[10px] text-muted-foreground">{"fields"}</span>
                 </div>
@@ -285,8 +292,8 @@ export function ImportPdfDialog({ open, onOpenChange, onImportComplete }: Import
               {"ยกเลิก"}
             </Button>
             {phase === "preview" && (
-              <Button size="sm" className="gap-1 bg-[#10b981] hover:bg-[#059669] text-white text-[11px] font-bold" onClick={handleConfirmImport}>
-                {"นำเข้าข้อมูลไปยังฟอร์ม"}
+              <Button size="sm" className={cn("gap-1 text-white text-[11px] font-bold", parsedData?.regType === "jr" ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700")} onClick={handleConfirmImport}>
+                {parsedData?.regType === "jr" ? "นำเข้าไปแบบ จ.ร.๑" : "นำเข้าไปแบบ จ.ค.๑"}
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             )}

@@ -4,7 +4,11 @@
  * and maps fields to the FdaFormData structure.
  */
 
-import type { FdaFormData, FdaIngredientRow } from "@/components/fda/create-fda-dialog"
+import type { FdaIngredientRow } from "@/components/fda/create-jk-dialog"
+
+// Generic parsed data for both JK and JR forms
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ParsedFdaData = Record<string, any>
 
 /**
  * Detect if text is จ.ร. (receipt) or จ.ค. (application)
@@ -130,11 +134,11 @@ function parseContainerType(text: string): string {
 /**
  * Main parser: takes raw PDF text and returns partial FdaFormData
  */
-export function parseFdaPdfText(rawText: string): Partial<FdaFormData> {
+export function parseFdaPdfText(rawText: string): ParsedFdaData {
   const text = rawText.replace(/\r/g, "")
   const regType = detectType(text)
 
-  const result: Partial<FdaFormData> = { regType }
+  const result: ParsedFdaData = { regType }
 
   // === จ.ร. (Receipt) parsing ===
   if (regType === "jr") {

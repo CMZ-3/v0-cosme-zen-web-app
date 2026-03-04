@@ -1,13 +1,18 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { ShieldCheck, Plus, FileUp, FileSpreadsheet, Download, LayoutList, BarChart3, CheckSquare } from "lucide-react"
+import { ShieldCheck, Plus, FileUp, FileSpreadsheet, Download, LayoutList, BarChart3, CheckSquare, FileText, FileCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog"
 import { FdaKpiCards } from "@/components/fda/fda-kpi-cards"
 import { FdaTable } from "@/components/fda/fda-table"
-import { CreateFdaDialog } from "@/components/fda/create-fda-dialog"
-import type { FdaFormData } from "@/components/fda/create-fda-dialog"
+import { CreateJkDialog } from "@/components/fda/create-jk-dialog"
+import { CreateJrDialog } from "@/components/fda/create-jr-dialog"
+import type { JkFormData } from "@/components/fda/create-jk-dialog"
+import type { JrFormData } from "@/components/fda/create-jr-dialog"
 import { ImportPdfDialog } from "@/components/fda/import-pdf-dialog"
 import { mockFdaKPI, mockFdaList } from "@/lib/fda-mock-data"
 import type { RegistrationType } from "@/lib/fda-types"
@@ -23,21 +28,88 @@ const pageTabs: { value: PageTab; label: string; icon: typeof LayoutList }[] = [
 
 export default function FdaPage() {
   const router = useRouter()
-  const [createOpen, setCreateOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
-  const [importedData, setImportedData] = useState<Partial<FdaFormData> | undefined>(undefined)
   const [activeTab, setActiveTab] = useState<PageTab>("list")
   const [typeFilter, setTypeFilter] = useState<RegistrationType | "all">("all")
 
-  const handleImportComplete = (data: Partial<FdaFormData>) => {
-    setImportedData(data)
-    setCreateOpen(true)
-  }
+  // Type picker dialog
+  const [typePickerOpen, setTypePickerOpen] = useState(false)
 
-  const handleCreateOpenChange = (open: boolean) => {
-    setCreateOpen(open)
-    if (!open) setImportedData(undefined)
-  }
+  // Separate form dialogs
+  const [jkOpen, setJkOpen] = useState(false)
+  const [jrOpen, setJrOpen] = useState(false)
+  const [jkInitialData, setJkInitialData] = useState<Partial<JkFormData> | undefined>(undefined)
+  const [jrInitialData, setJrInitialData] = useState<Partial<JrFormData> | undefined>(undefined)
+
+  // Import dialog
+  const [importOpen, setImportOpen] = useState(false)
+
+  const openJk = useCallback((data?: Partial<JkFormData>) => {
+    setJkInitialData(data)
+    setJkOpen(true)
+  }, [])
+
+  const openJr = useCallback((data?: Partial<JrFormData>) => {
+    setJrInitialData(data)
+    setJrOpen(true)
+  }, [])
+
+  const handleJkClose = useCallback((o: boolean) => {
+    setJkOpen(o)
+    if (!o) setJkInitialData(undefined)
+  }, [])
+
+  const handleJrClose = useCallback((o: boolean) => {
+    setJrOpen(o)
+    if (!o) setJrInitialData(undefined)
+  }, [])
+
+  // Import complete handler: routes to the correct form based on detected type
+  const handleImportComplete = useCallback((data: Record<string, unknown>) => {
+    const regType = data.regType as string | undefined
+    if (regType === "jr") {
+      // Map the generic parsed data to JrFormData fields
+      const jrData: Partial<JrFormData> = {
+        productNameTh: (data.productNameTh as string) || "",
+        productNameEn: (data.productNameEn as string) || "",
+        physicalForm: (data.physicalForm as string) || "",
+        containerType: (data.containerType as string) || "",
+        productFormat: (data.productFormat === "single" ? "ผลิตภัณฑ์เดี่ยว" : (data.productFormat as string)) || "",
+        cosmeticType: [data.applicationArea, data.productPurpose].filter(Boolean).join("/") || "",
+        businessType: (data.businessType as JrFormData["businessType"]) || "contract_manufacture",
+        cm_contractorName: (data.cm_contractorName as string) || "",
+        cm_factoryAddress: (data.cm_factoryAddress as string) || "",
+        cm_storageAddress: (data.cm_storageAddress as string) || "",
+        cm_clientName: (data.cm_clientName as string) || "",
+        cm_clientAddress: (data.cm_clientAddress as string) || "",
+      }
+      openJr(jrData)
+    } else {
+      // JK form
+      const jkData: Partial<JkFormData> = {
+        purpose: (data.purpose as JkFormData["purpose"]) || "domestic",
+        tradeNameTh: (data.tradeNameTh as string) || "",
+        tradeNameEn: (data.tradeNameEn as string) || "",
+        productNameTh: (data.productNameTh as string) || "",
+        productNameEn: (data.productNameEn as string) || "",
+        usageFormat: (data.usageFormat as JkFormData["usageFormat"]) || "",
+        applicationArea: (data.applicationArea as string) || "",
+        productPurpose: (data.productPurpose as string) || "",
+        usageInstructions: (data.usageInstructions as string) || "",
+        physicalForm: (data.physicalForm as string) || "",
+        containerType: (data.containerType as string) || "",
+        productFormat: (data.productFormat as JkFormData["productFormat"]) || "",
+        businessType: (data.businessType as JkFormData["businessType"]) || "contract_manufacture",
+        cm_contractorName: (data.cm_contractorName as string) || "",
+        cm_contractorOffice: (data.cm_contractorOffice as string) || "",
+        cm_factoryAddress: (data.cm_factoryAddress as string) || "",
+        cm_storageAddress: (data.cm_storageAddress as string) || "",
+        cm_clientName: (data.cm_clientName as string) || "",
+        cm_clientAddress: (data.cm_clientAddress as string) || "",
+        ingredients: (data.ingredients as JkFormData["ingredients"]) || [{ no: 1, casNumber: "", inciName: "" }],
+      }
+      openJk(jkData)
+    }
+  }, [openJk, openJr])
 
   const filteredList = useMemo(() => {
     if (typeFilter === "all") return mockFdaList
@@ -72,7 +144,7 @@ export default function FdaPage() {
             <Download className="h-3.5 w-3.5" />
             Export
           </Button>
-          <Button size="sm" className="gap-1.5 rounded-xl bg-[#10b981] hover:bg-[#059669] text-white text-[11px] font-bold shadow-[0_2px_8px_rgba(16,185,129,0.3)]" onClick={() => { setImportedData(undefined); setCreateOpen(true) }}>
+          <Button size="sm" className="gap-1.5 rounded-xl bg-[#10b981] hover:bg-[#059669] text-white text-[11px] font-bold shadow-[0_2px_8px_rgba(16,185,129,0.3)]" onClick={() => setTypePickerOpen(true)}>
             <Plus className="h-4 w-4" />
             {"สร้างทะเบียน"}
           </Button>
@@ -81,30 +153,16 @@ export default function FdaPage() {
 
       {/* Page Tabs + Type Toggle */}
       <div className="flex items-center justify-between">
-        {/* Page tabs */}
         <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1">
           {pageTabs.map((tab) => {
             const isActive = activeTab === tab.value
             return (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => setActiveTab(tab.value)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-semibold transition-all",
-                  isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-secondary"
-                )}
-              >
-                <tab.icon className="h-3.5 w-3.5" />
-                {tab.label}
+              <button key={tab.value} type="button" onClick={() => setActiveTab(tab.value)} className={cn("flex items-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-semibold transition-all", isActive ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-secondary")}>
+                <tab.icon className="h-3.5 w-3.5" />{tab.label}
               </button>
             )
           })}
         </div>
-
-        {/* JK / JR toggle */}
         <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1">
           {([
             { value: "all" as const, label: "All", dot: "bg-muted-foreground" },
@@ -113,19 +171,8 @@ export default function FdaPage() {
           ]).map((opt) => {
             const isActive = typeFilter === opt.value
             return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setTypeFilter(opt.value as RegistrationType | "all")}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-all",
-                  isActive
-                    ? "bg-secondary text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <span className={cn("h-2 w-2 rounded-full", opt.dot)} />
-                {opt.label}
+              <button key={opt.value} type="button" onClick={() => setTypeFilter(opt.value as RegistrationType | "all")} className={cn("flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-all", isActive ? "bg-secondary text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                <span className={cn("h-2 w-2 rounded-full", opt.dot)} />{opt.label}
               </button>
             )
           })}
@@ -135,14 +182,10 @@ export default function FdaPage() {
       {/* Tab Content */}
       {activeTab === "list" && (
         <>
-          {/* KPI Cards */}
           <FdaKpiCards kpi={mockFdaKPI} />
-
-          {/* Table */}
           <FdaTable data={filteredList} onRowClick={(id) => router.push(`/fda/${id}`)} />
         </>
       )}
-
       {activeTab === "dashboard" && (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-20">
           <BarChart3 className="h-10 w-10 text-muted-foreground/30" />
@@ -150,7 +193,6 @@ export default function FdaPage() {
           <p className="text-[11px] text-muted-foreground">Charts, expiry timeline & renewal planning coming soon</p>
         </div>
       )}
-
       {activeTab === "approval" && (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-20">
           <CheckSquare className="h-10 w-10 text-muted-foreground/30" />
@@ -159,10 +201,54 @@ export default function FdaPage() {
         </div>
       )}
 
-      {/* Create Dialog */}
-      <CreateFdaDialog open={createOpen} onOpenChange={handleCreateOpenChange} initialData={importedData} />
+      {/* ───── Type Picker Dialog ───── */}
+      <Dialog open={typePickerOpen} onOpenChange={setTypePickerOpen}>
+        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b border-border">
+            <DialogTitle className="text-lg font-extrabold">{"เลือกประเภทแบบฟอร์ม"}</DialogTitle>
+            <p className="text-[11px] text-muted-foreground">{"เลือกประเภทเอกสารที่ต้องการสร้าง"}</p>
+          </DialogHeader>
+          <div className="p-6 flex flex-col gap-3">
+            {/* JK Option */}
+            <button
+              type="button"
+              onClick={() => { setTypePickerOpen(false); openJk() }}
+              className="flex items-start gap-4 rounded-xl border-2 border-blue-200 bg-blue-50/30 hover:bg-blue-50 px-5 py-4 text-left transition-all hover:border-blue-400"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 shrink-0 mt-0.5">
+                <FileText className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-base font-extrabold text-blue-800">{"แบบ จ.ค.๑"}</p>
+                <p className="text-[12px] font-semibold text-blue-600">{"คำขอจดแจ้งเครื่องสำอาง"}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{"ฟอร์มเต็ม 10 ข้อ: ข้อมูลผลิตภัณฑ์, ลักษณะ, ผู้ประกอบการ, ส่วนผสม INCI, การรับรอง"}</p>
+              </div>
+            </button>
 
-      {/* Import PDF Dialog */}
+            {/* JR Option */}
+            <button
+              type="button"
+              onClick={() => { setTypePickerOpen(false); openJr() }}
+              className="flex items-start gap-4 rounded-xl border-2 border-amber-200 bg-amber-50/30 hover:bg-amber-50 px-5 py-4 text-left transition-all hover:border-amber-400"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 shrink-0 mt-0.5">
+                <FileCheck className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-base font-extrabold text-amber-800">{"แบบ จ.ร.๑"}</p>
+                <p className="text-[12px] font-semibold text-amber-600">{"ใบรับจดแจ้งเครื่องสำอาง"}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{"ข้อมูลสรุป: เลขที่ใบรับจดแจ้ง, วันออก/หมดอายุ, ข้อมูลผลิตภัณฑ์, ผู้ประกอบการ"}</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ───── Form Dialogs ───── */}
+      <CreateJkDialog open={jkOpen} onOpenChange={handleJkClose} initialData={jkInitialData} />
+      <CreateJrDialog open={jrOpen} onOpenChange={handleJrClose} initialData={jrInitialData} />
+
+      {/* ───── Import PDF Dialog ───── */}
       <ImportPdfDialog open={importOpen} onOpenChange={setImportOpen} onImportComplete={handleImportComplete} />
     </div>
   )
