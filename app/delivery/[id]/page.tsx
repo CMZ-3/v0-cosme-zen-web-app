@@ -173,7 +173,7 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
                   <Pencil className="h-3 w-3" /> Edit
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]" onClick={() => toast.success(`Printing ${order.deliveryNumber}...`)}>
+              <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]" onClick={() => window.open(`/delivery/${id}/print`, "_blank")}>
                 <Printer className="h-3 w-3" /> Print DO
               </Button>
             </div>

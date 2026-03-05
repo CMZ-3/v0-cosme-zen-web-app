@@ -286,7 +286,7 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
                           type="button"
                           className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary transition-all hover:border-primary hover:bg-primary/10"
                           title="Print"
-                          onClick={() => toast({ title: "Print DO", description: `Printing ${row.deliveryNumber}...` })}
+                          onClick={() => window.open(`/delivery/${row.id}/print`, "_blank")}
                         >
                           <Printer className="h-3 w-3 text-muted-foreground" />
                         </button>

@@ -1,11 +1,18 @@
 "use client"
 
 import { useState } from "react"
+import { usePathname } from "next/navigation"
 import { AppSidebar } from "./app-sidebar"
 import { cn } from "@/lib/utils"
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
+  const pathname = usePathname()
+  const isPrint = pathname.endsWith("/print")
+
+  if (isPrint) {
+    return <>{children}</>
+  }
 
   return (
     <div className="flex min-h-screen bg-background">
