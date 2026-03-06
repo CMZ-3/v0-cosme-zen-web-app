@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts"
+import { Cell, Pie, PieChart } from "recharts"
 import { mockStockDashboard, mockAlerts } from "@/lib/stock-mock-data"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -47,18 +47,16 @@ export function DashboardStockHealth() {
             }}
             className="h-[140px] w-[140px] shrink-0"
           >
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Pie data={donutData} cx="50%" cy="50%" innerRadius={38} outerRadius={60} paddingAngle={3} dataKey="value" strokeWidth={0}>
-                  {donutData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <text x="50%" y="48%" textAnchor="middle" className="fill-foreground text-xl font-extrabold">{total}</text>
-                <text x="50%" y="62%" textAnchor="middle" className="fill-muted-foreground text-[10px]">{"items"}</text>
-              </PieChart>
-            </ResponsiveContainer>
+            <PieChart>
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Pie data={donutData} cx="50%" cy="50%" innerRadius={38} outerRadius={60} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                {donutData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Pie>
+              <text x="50%" y="48%" textAnchor="middle" className="fill-foreground text-xl font-extrabold">{total}</text>
+              <text x="50%" y="62%" textAnchor="middle" className="fill-muted-foreground text-[10px]">{"items"}</text>
+            </PieChart>
           </ChartContainer>
 
           {/* Legend */}
