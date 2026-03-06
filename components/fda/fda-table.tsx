@@ -321,7 +321,6 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
           </TableBody>
         </Table>
       </div>
-      </div>
 
       {/* Pagination Footer */}
       <div className="flex items-center justify-between px-1">
