@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 
@@ -55,38 +55,34 @@ export function DashboardRevenueChart() {
             }}
             className="h-[220px]"
           >
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={BLUE} stopOpacity={0.15} />
-                    <stop offset="95%" stopColor={BLUE} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gCost" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={GREEN} stopOpacity={0.10} />
-                    <stop offset="95%" stopColor={GREEN} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(v: number) => `${(v / 1e6).toFixed(1)}M`} tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(v: number) => `${(v as number).toLocaleString()} THB`} />} />
-                <Area type="monotone" dataKey="revenue" stroke={BLUE} strokeWidth={2.5} fill="url(#gRevenue)" />
-                <Area type="monotone" dataKey="cost" stroke={GREEN} strokeWidth={2} fill="url(#gCost)" strokeDasharray="5 3" />
-              </AreaChart>
-            </ResponsiveContainer>
+            <AreaChart data={monthlyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gRevenue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={BLUE} stopOpacity={0.15} />
+                  <stop offset="95%" stopColor={BLUE} stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gCost" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={GREEN} stopOpacity={0.10} />
+                  <stop offset="95%" stopColor={GREEN} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={(v: number) => `${(v / 1e6).toFixed(1)}M`} tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
+              <ChartTooltip content={<ChartTooltipContent formatter={(v: number) => `${(v as number).toLocaleString()} THB`} />} />
+              <Area type="monotone" dataKey="revenue" stroke={BLUE} strokeWidth={2.5} fill="url(#gRevenue)" />
+              <Area type="monotone" dataKey="cost" stroke={GREEN} strokeWidth={2} fill="url(#gCost)" strokeDasharray="5 3" />
+            </AreaChart>
           </ChartContainer>
         ) : (
           <ChartContainer config={{ orders: { label: "Orders", color: PURPLE } }} className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="orders" fill={PURPLE} radius={[6, 6, 0, 0]} barSize={32} />
-              </BarChart>
-            </ResponsiveContainer>
+            <BarChart data={monthlyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="orders" fill={PURPLE} radius={[6, 6, 0, 0]} barSize={32} />
+            </BarChart>
           </ChartContainer>
         )}
         {/* Legend */}
