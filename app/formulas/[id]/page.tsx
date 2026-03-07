@@ -8,7 +8,7 @@ import {
   ArrowLeft, ChevronRight, Pencil, Copy, Trash2, CheckCircle, Zap, Archive, Undo2,
   FlaskConical, Beaker, Layers, Settings2, ClipboardCheck, GitBranch, DollarSign,
   FileText, Puzzle, Thermometer, Clock, Gauge, Wrench, AlertTriangle, Plus,
-  Download, Eye,
+  Download, Eye, Shield, Package, TestTube, Snowflake, Sun, Bug,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -116,9 +116,11 @@ export default function FormulaDetailPage() {
               { v: "overview", label: "Overview", icon: Eye },
               { v: "ingredients", label: "Ingredients", icon: Beaker },
               { v: "phases", label: "Phases & Steps", icon: Layers },
-              { v: "qc", label: "QC Specs", icon: ClipboardCheck },
-              { v: "versions", label: "Versions", icon: GitBranch },
               { v: "cost", label: "Cost", icon: DollarSign },
+              { v: "qc", label: "QC Specs", icon: ClipboardCheck },
+              { v: "stability", label: "Stability", icon: Shield },
+              { v: "packaging", label: "Packaging", icon: Package },
+              { v: "versions", label: "Versions", icon: GitBranch },
               { v: "documents", label: "Documents", icon: FileText },
               { v: "extended", label: "Extended", icon: Puzzle },
             ].map((t) => (
@@ -153,6 +155,16 @@ export default function FormulaDetailPage() {
           {/* ===== QC SPECS ===== */}
           <TabsContent value="qc" className="m-0 p-6">
             <QcSpecsTab isDraft={isDraft} />
+          </TabsContent>
+
+          {/* ===== STABILITY ===== */}
+          <TabsContent value="stability" className="m-0 p-6">
+            <StabilityTab />
+          </TabsContent>
+
+          {/* ===== PACKAGING ===== */}
+          <TabsContent value="packaging" className="m-0 p-6">
+            <PackagingTab />
           </TabsContent>
 
           {/* ===== VERSIONS ===== */}
@@ -731,6 +743,230 @@ function ExtendedTab() {
               ))}
             </TableBody>
           </Table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================================
+   STABILITY TAB
+   ============================================================================ */
+function StabilityTab() {
+  const testTypes = [
+    { type: "Room Temperature", icon: Thermometer, temp: "25°C", rh: "60%", duration: "24 months", status: "ongoing", color: "text-blue-600 bg-blue-50" },
+    { type: "Accelerated", icon: Thermometer, temp: "40°C", rh: "75%", duration: "6 months", status: "passed", color: "text-emerald-600 bg-emerald-50" },
+    { type: "Freeze-Thaw", icon: Snowflake, temp: "-10°C / 25°C", rh: "--", duration: "5 cycles", status: "passed", color: "text-emerald-600 bg-emerald-50" },
+    { type: "Photostability", icon: Sun, temp: "25°C", rh: "60%", duration: "ICH Q1B", status: "pending", color: "text-amber-600 bg-amber-50" },
+    { type: "Microbial (PET)", icon: Bug, temp: "25°C", rh: "--", duration: "28 days", status: "passed", color: "text-emerald-600 bg-emerald-50" },
+  ]
+
+  return (
+    <div className="space-y-5">
+      {/* Stability Summary */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Shelf Life</p>
+          <p className="text-2xl font-extrabold text-foreground mt-1">24 <span className="text-sm font-normal text-muted-foreground">months</span></p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Storage</p>
+          <p className="text-[14px] font-bold text-foreground mt-1">Below 30°C</p>
+          <p className="text-[11px] text-muted-foreground">Avoid direct sunlight</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-[10px] text-muted-foreground uppercase font-semibold">PAO</p>
+          <p className="text-2xl font-extrabold text-foreground mt-1">12M</p>
+          <p className="text-[11px] text-muted-foreground">Period After Opening</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Test Status</p>
+          <p className="text-[14px] font-bold text-emerald-600 mt-1">4/5 Passed</p>
+          <p className="text-[11px] text-muted-foreground">1 ongoing</p>
+        </div>
+      </div>
+
+      {/* Test Cards */}
+      <div className="space-y-3">
+        <h3 className="text-[14px] font-bold text-foreground flex items-center gap-2">
+          <Shield className="h-4 w-4 text-violet-500" /> Stability Tests
+        </h3>
+        <div className="grid grid-cols-1 gap-3">
+          {testTypes.map((test) => {
+            const Icon = test.icon
+            return (
+              <div key={test.type} className="rounded-xl border border-border bg-card p-4 flex items-center gap-4">
+                <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", test.color)}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="flex-1 grid grid-cols-5 gap-4 items-center">
+                  <div>
+                    <p className="text-[12px] font-bold text-foreground">{test.type}</p>
+                    <p className="text-[10px] text-muted-foreground">Stability Test</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Temp</p>
+                    <p className="text-[12px] font-semibold">{test.temp}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">RH</p>
+                    <p className="text-[12px] font-semibold">{test.rh}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Duration</p>
+                    <p className="text-[12px] font-semibold">{test.duration}</p>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant="outline" className={cn("text-[10px]", 
+                      test.status === "passed" ? "border-emerald-200 text-emerald-600" :
+                      test.status === "ongoing" ? "border-blue-200 text-blue-600" :
+                      "border-amber-200 text-amber-600"
+                    )}>
+                      {test.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Results Table from mockStabilityTests */}
+      <div className="space-y-3">
+        <h3 className="text-[14px] font-bold text-foreground">Detailed Results</h3>
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead className="text-[10px]">Test Type</TableHead>
+                <TableHead className="text-[10px]">Parameter</TableHead>
+                <TableHead className="text-[10px]">Method</TableHead>
+                <TableHead className="text-[10px]">Duration</TableHead>
+                <TableHead className="text-[10px]">Result</TableHead>
+                <TableHead className="text-[10px]">Notes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {mockStabilityTests.map((st) => (
+                <TableRow key={st.id} className="hover:bg-muted/20">
+                  <TableCell className="text-[12px] font-semibold">{st.testType}</TableCell>
+                  <TableCell className="text-[11px]">{st.parameter ?? "--"}</TableCell>
+                  <TableCell className="text-[11px] text-muted-foreground">{st.method ?? "--"}</TableCell>
+                  <TableCell className="text-[11px]">{st.duration ?? "--"}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn("text-[10px]", st.result === "Pass" ? "border-emerald-200 text-emerald-600" : "border-red-200 text-red-600")}>
+                      {st.result ?? "--"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-[11px] text-muted-foreground">{st.notes ?? "--"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================================
+   PACKAGING TAB
+   ============================================================================ */
+function PackagingTab() {
+  const compatibleMaterials = [
+    { name: "HDPE", compatible: true, notes: "Recommended for most formulas" },
+    { name: "PET", compatible: true, notes: "Good clarity, suitable for serums" },
+    { name: "PP", compatible: true, notes: "Heat resistant" },
+    { name: "Glass", compatible: true, notes: "Best for actives, premium feel" },
+    { name: "Aluminum", compatible: false, notes: "May react with low pH formulas" },
+    { name: "PS", compatible: false, notes: "Not recommended - solvent sensitivity" },
+  ]
+
+  const recommendedPackaging = [
+    { type: "Primary", item: "Airless Pump Bottle", material: "PP/HDPE", size: "30mL / 50mL", notes: "Prevents oxidation" },
+    { type: "Primary", item: "Dropper Bottle", material: "Glass/PET", size: "30mL", notes: "For serum formats" },
+    { type: "Secondary", item: "Carton Box", material: "Cardboard", size: "Custom", notes: "UV protection" },
+    { type: "Tertiary", item: "Shipping Box", material: "Corrugated", size: "12 units", notes: "Standard shipping" },
+  ]
+
+  return (
+    <div className="space-y-5">
+      {/* Material Compatibility */}
+      <div className="space-y-3">
+        <h3 className="text-[14px] font-bold text-foreground flex items-center gap-2">
+          <Package className="h-4 w-4 text-violet-500" /> Material Compatibility
+        </h3>
+        <div className="grid grid-cols-3 gap-3">
+          {compatibleMaterials.map((mat) => (
+            <div key={mat.name} className={cn(
+              "rounded-xl border p-4",
+              mat.compatible ? "border-emerald-200 bg-emerald-50/50" : "border-red-200 bg-red-50/50"
+            )}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[13px] font-bold">{mat.name}</p>
+                <Badge variant="outline" className={cn("text-[10px]", 
+                  mat.compatible ? "border-emerald-300 text-emerald-600" : "border-red-300 text-red-600"
+                )}>
+                  {mat.compatible ? "Compatible" : "Not Recommended"}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground">{mat.notes}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recommended Packaging */}
+      <div className="space-y-3">
+        <h3 className="text-[14px] font-bold text-foreground">Recommended Packaging</h3>
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead className="text-[10px]">Type</TableHead>
+                <TableHead className="text-[10px]">Item</TableHead>
+                <TableHead className="text-[10px]">Material</TableHead>
+                <TableHead className="text-[10px]">Size</TableHead>
+                <TableHead className="text-[10px]">Notes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recommendedPackaging.map((pkg, idx) => (
+                <TableRow key={idx} className="hover:bg-muted/20">
+                  <TableCell>
+                    <Badge variant="outline" className={cn("text-[10px]",
+                      pkg.type === "Primary" ? "border-violet-200 text-violet-600" :
+                      pkg.type === "Secondary" ? "border-blue-200 text-blue-600" :
+                      "border-gray-200 text-gray-600"
+                    )}>
+                      {pkg.type}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-[12px] font-semibold">{pkg.item}</TableCell>
+                  <TableCell className="text-[11px]">{pkg.material}</TableCell>
+                  <TableCell className="text-[11px]">{pkg.size}</TableCell>
+                  <TableCell className="text-[11px] text-muted-foreground">{pkg.notes}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Compatibility Notes */}
+      <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[12px] font-bold text-amber-800">Packaging Notes</p>
+            <ul className="text-[11px] text-amber-700 mt-1 space-y-1 list-disc list-inside">
+              <li>Avoid metallic containers due to low pH (5.0-5.5)</li>
+              <li>Use UV-protective packaging for photosensitive actives (Vitamin C)</li>
+              <li>Airless pump recommended to prevent oxidation</li>
+              <li>Ensure closure torque does not exceed 1.2 Nm</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
