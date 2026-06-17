@@ -10,11 +10,12 @@ import { DashboardActivityFeed } from "@/components/dashboard/dashboard-activity
 import { DashboardUpcomingDeadlines } from "@/components/dashboard/dashboard-upcoming-deadlines"
 import { DashboardQuickLinks } from "@/components/dashboard/dashboard-quick-links"
 import { DashboardV2 } from "@/components/dashboard/dashboard-v2"
-import { LayoutDashboard, Sparkles } from "lucide-react"
+import { DashboardV3 } from "@/components/dashboard/dashboard-v3"
+import { LayoutDashboard, Sparkles, Layers } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function DashboardPage() {
-  const [tab, setTab] = useState<"v1" | "v2">("v1")
+  const [tab, setTab] = useState<"v1" | "v2" | "v3">("v1")
 
   return (
     <div>
@@ -46,6 +47,19 @@ export default function DashboardPage() {
           >
             <Sparkles className="h-3.5 w-3.5" />
             v2 Preview
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("v3")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12px] font-bold transition-all",
+              tab === "v3"
+                ? "bg-blue-100 text-blue-700"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+            )}
+          >
+            <Layers className="h-3.5 w-3.5" />
+            v3 Preview
           </button>
         </div>
       </div>
@@ -87,8 +101,11 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* V2 -- New design */}
+      {/* V2 -- Soft pastel design */}
       {tab === "v2" && <DashboardV2 />}
+
+      {/* V3 -- Clean minimal finance-style */}
+      {tab === "v3" && <DashboardV3 />}
     </div>
   )
 }
