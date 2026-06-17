@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { mockJobOrders } from "@/lib/job-order-mock-data"
-import { mockDeliveries } from "@/lib/delivery-mock-data"
+import { mockDeliveryOrders } from "@/lib/delivery-mock-data"
 import { mockStockCards } from "@/lib/stock-mock-data"
 import { mockFdaList } from "@/lib/fda-mock-data"
 import {
@@ -32,8 +32,8 @@ function getDerivedData() {
   const totalRevenue = mockJobOrders.reduce((a, j) => a + (j.totalValue ?? 0), 0)
   const monthlyTarget = 3_200_000
 
-  const inTransit = mockDeliveries.filter((d) => d.status === "shipped").length
-  const delivered = mockDeliveries.filter((d) => d.status === "delivered").length
+  const inTransit = mockDeliveryOrders.filter((d) => d.status === "shipped").length
+  const delivered = mockDeliveryOrders.filter((d) => d.status === "delivered").length
 
   const lowStock = mockStockCards.filter((s) => s.inventoryStatus === "low_stock").length
   const outOfStock = mockStockCards.filter((s) => s.inventoryStatus === "out_of_stock").length
@@ -146,7 +146,7 @@ export function DashboardV3() {
 
   const recentActivities = [
     { label: "JO Completed", detail: mockJobOrders[0]?.orderNumber ?? "JO-001", value: "+฿" + ((mockJobOrders[0]?.totalValue ?? 0) / 1000).toFixed(0) + "K", color: "#10b981", date: "Today" },
-    { label: "Delivery Shipped", detail: mockDeliveries[0]?.deliveryNumber ?? "DO-001", value: mockDeliveries[0]?.customerName ?? "—", color: "#2563eb", date: "Today" },
+    { label: "Delivery Shipped", detail: mockDeliveryOrders[0]?.deliveryNumber ?? "DO-001", value: mockDeliveryOrders[0]?.customerName ?? "—", color: "#2563eb", date: "Today" },
     { label: "FDA Submitted", detail: mockFdaList[0]?.productName ?? "—", value: "Pending", color: "#f97316", date: "Yesterday" },
     { label: "Stock Alert", detail: `${data.lowStock} items low`, value: "Action needed", color: "#ef4444", date: "Yesterday" },
     { label: "New JO Created", detail: mockJobOrders[1]?.orderNumber ?? "JO-002", value: "+฿" + ((mockJobOrders[1]?.totalValue ?? 0) / 1000).toFixed(0) + "K", color: "#8b5cf6", date: "2d ago" },
