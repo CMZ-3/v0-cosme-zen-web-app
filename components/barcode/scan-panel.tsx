@@ -9,7 +9,9 @@ import { BarcodeSVG } from "./barcode-svg"
 import { findCardByScan, normalizeScan, resolveBarcodeValue } from "@/lib/barcode-utils"
 import type { StockCard } from "@/lib/stock-types"
 import { inventoryStatusColors, inventoryStatusLabels } from "@/lib/stock-types"
-import { ScanLine, CheckCircle2, XCircle, ExternalLink, MapPin, Package, History, Zap } from "lucide-react"
+import { ScanLine, CheckCircle2, XCircle, ExternalLink, MapPin, Package, History, Zap, ArrowDownToLine, ArrowUpFromLine } from "lucide-react"
+import { toast } from "sonner"
+import { mutate as globalMutate } from "swr"
 
 interface ScanEvent {
   raw: string
@@ -26,6 +28,31 @@ export function ScanPanel({ cards }: ScanPanelProps) {
   const [listening, setListening] = useState(true)
   const [last, setLast] = useState<ScanEvent | null>(null)
   const [history, setHistory] = useState<ScanEvent[]>([])
+  const [actionQty, setActionQty] = useState("1")
+  const [actionLoading, setActionLoading] = useState(false)
+
+  async function postAction(cardId: string, action: "issue" | "receive") {
+    const qty = Number(actionQty)
+    if (!qty || qty <= 0) { toast.error("Enter a valid quantity"); return }
+    setActionLoading(true)
+    try {
+      const res = await fetch("/api/stock/barcode-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, cardId, qty }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Action failed")
+      toast.success(`${action === "issue" ? "Issued" : "Received"} ${qty} — new balance: ${data.newBalance}`)
+      globalMutate("/api/stock/cards")
+      globalMutate("/api/stock/movements")
+      setActionQty("1")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Action failed")
+    } finally {
+      setActionLoading(false)
+    }
+  }
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Keep the input focused so a keyboard-wedge scanner always lands here.
@@ -144,7 +171,7 @@ export function ScanPanel({ cards }: ScanPanelProps) {
                     <span>Available: <strong className="text-foreground">{last.match.available.toLocaleString()}</strong></span>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
+                  <div className="flex flex-col items-end gap-2">
                   <BarcodeSVG value={resolveBarcodeValue(last.match)} height={40} barWidth={1.6} fontSize={11} />
                   <Button asChild size="sm" className="h-8 gap-1.5 text-[11px]">
                     <Link href={`/stock/${last.match.id}`}>
@@ -152,6 +179,36 @@ export function ScanPanel({ cards }: ScanPanelProps) {
                     </Link>
                   </Button>
                 </div>
+              </div>
+
+              {/* Quick Issue / Receive action */}
+              <div className="mt-3 flex items-center gap-2 border-t border-emerald-200 pt-3">
+                <Input
+                  type="number"
+                  min={1}
+                  value={actionQty}
+                  onChange={(e) => setActionQty(e.target.value)}
+                  className="h-8 w-20 text-center font-mono text-sm"
+                  aria-label="Quantity"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1 text-[11px] border-red-300 text-red-600 hover:bg-red-50"
+                  disabled={actionLoading}
+                  onClick={() => postAction(last!.match!.id, "issue")}
+                >
+                  <ArrowUpFromLine className="h-3.5 w-3.5" /> Issue
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1 text-[11px] border-blue-300 text-blue-600 hover:bg-blue-50"
+                  disabled={actionLoading}
+                  onClick={() => postAction(last!.match!.id, "receive")}
+                >
+                  <ArrowDownToLine className="h-3.5 w-3.5" /> Receive
+                </Button>
               </div>
             </div>
           )}

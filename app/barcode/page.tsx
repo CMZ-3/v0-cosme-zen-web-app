@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
+import useSWR from "swr"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +13,6 @@ import { ScanPanel } from "@/components/barcode/scan-panel"
 import { CountPanel } from "@/components/barcode/count-panel"
 import { BarcodeSVG } from "@/components/barcode/barcode-svg"
 import { LabelSheet, type LotLabelData } from "@/components/barcode/label-sheet"
-import { mockStockCards, mockStockLots } from "@/lib/stock-mock-data"
 import {
   resolveBarcodeValue,
   barcodeSource,
@@ -21,8 +21,11 @@ import {
   daysUntilExpiry,
   type ExpiryLevel,
 } from "@/lib/barcode-utils"
+import type { StockCard, StockLot } from "@/lib/stock-types"
 import { itemTypeColors, itemTypeLabels } from "@/lib/stock-types"
 import { ScanLine, Printer, Search, Barcode as BarcodeIcon, Layers, CheckCircle2, ClipboardCheck, Boxes, Clock } from "lucide-react"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 const expiryBadge: Record<ExpiryLevel, string> = {
   expired: "bg-red-100 text-red-700",
@@ -37,12 +40,49 @@ export default function BarcodePage() {
   const [lotSelected, setLotSelected] = useState<Set<string>>(new Set())
   const [printTarget, setPrintTarget] = useState<"cards" | "lots">("cards")
 
-  const cards = mockStockCards
+  // Live data from DB via SWR
+  const { data: cardsData } = useSWR("/api/stock/cards", fetcher, { revalidateOnFocus: false })
+  const { data: lotsData } = useSWR("/api/stock/lots", fetcher, { revalidateOnFocus: false })
+
+  const cards: StockCard[] = useMemo(() => {
+    const rows = cardsData?.cards ?? []
+    return rows.map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      itemCode: r.itemCode as string,
+      itemName: r.itemName as string,
+      itemNameEn: r.itemNameEn as string | undefined,
+      itemType: (r.itemType ?? "raw_material") as StockCard["itemType"],
+      unit: r.unit as string,
+      balance: Number(r.balance ?? 0),
+      available: Number(r.available ?? 0),
+      reservedStock: Number(r.reservedStock ?? 0),
+      incomingStock: Number(r.incomingStock ?? 0),
+      minStock: Number(r.minStock ?? 0),
+      maxStock: Number(r.maxStock ?? 0),
+      inventoryStatus: (r.inventoryStatus ?? "healthy") as StockCard["inventoryStatus"],
+      location: r.location as string | undefined,
+      barcode: r.barcode as string | undefined,
+      supplier: r.supplier as string | undefined,
+    }))
+  }, [cardsData])
+
+  const rawLots: StockLot[] = useMemo(() => {
+    const rows = lotsData?.lots ?? []
+    return rows.map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      stockCardId: r.stockCardId as string,
+      lotNumber: r.lotNumber as string,
+      quantity: Number(r.quantity ?? 0),
+      expireDate: r.expireDate as string | undefined,
+      manufactureDate: r.manufactureDate as string | undefined,
+      status: (r.status ?? "active") as StockLot["status"],
+    }))
+  }, [lotsData])
 
   // Join lots with their stock card for display + labels.
   const lotData: LotLabelData[] = useMemo(
     () =>
-      mockStockLots.map((lot) => {
+      rawLots.map((lot) => {
         const card = cards.find((c) => c.id === lot.stockCardId)
         return {
           lot,
@@ -51,7 +91,7 @@ export default function BarcodePage() {
           unit: card?.unit ?? "",
         }
       }),
-    [cards],
+    [rawLots, cards],
   )
 
   const filtered = useMemo(() => {

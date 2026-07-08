@@ -82,20 +82,41 @@ export function CountPanel({ cards }: CountPanelProps) {
 
   const variances = rows.filter((r) => r.counted !== r.card.balance)
 
-  function finalize() {
+  async function finalize() {
     if (rows.length === 0) {
       toast.error("Scan at least one item before finalizing")
       return
     }
     if (variances.length === 0) {
       toast.success("Count matches the system for every item — no adjustments needed")
-    } else {
-      toast.success(
-        `Count finalized: ${variances.length} adjustment movement${variances.length > 1 ? "s" : ""} created`,
-      )
+      setRows([])
+      setError(null)
+      return
     }
-    setRows([])
-    setError(null)
+
+    try {
+      const adjustments = variances.map((r) => ({
+        cardId: r.card.id,
+        counted: r.counted,
+        system: r.card.balance,
+        itemName: r.card.itemName,
+        itemCode: r.card.itemCode,
+      }))
+      const res = await fetch("/api/stock/barcode-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "finalize_count", adjustments }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Failed to save")
+      toast.success(
+        `Count saved (${data.refNo}): ${data.adjusted} adjustment${data.adjusted !== 1 ? "s" : ""} posted`,
+      )
+      setRows([])
+      setError(null)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save count")
+    }
   }
 
   function reset() {

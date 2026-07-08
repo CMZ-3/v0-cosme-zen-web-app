@@ -1,31 +1,40 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useTransition,
+  type ReactNode,
+} from "react"
+import useSWR, { mutate as globalMutate } from "swr"
 import type { StockSimulationState } from "./stock-simulation-store"
 import {
-  createInitialState,
   FORMULAS,
-  generateDocNo,
+  INIT_STOCK,
+  INIT_POS,
+  INIT_JOBS,
   calcRequired,
   getPiecesFromBatch,
-  getStockItem,
-  getPendingPOQty,
-  getEstDate,
-  nowTimestamp,
 } from "./stock-simulation-store"
 import type {
   SimulationBatch,
-  PurchaseOrder,
-  ReceiveRecord,
   MovementLogEntry,
   SavedReservation,
-  JobReservation,
 } from "./stock-types"
+
+// ---------------------------------------------------------------------------
+// The context API surface is intentionally unchanged so all 4 tabs continue to
+// work without modification. Only the data source moves from in-memory →
+// Neon PostgreSQL via /api/stock/workflow and /api/stock/movements.
+// ---------------------------------------------------------------------------
 
 interface StockSimContextValue {
   state: StockSimulationState
+  isLoading: boolean
   resetAll: () => void
-  // Simulator
+  // Simulator (client-side scratchpad – memoryBank never needs to persist)
   addToMemory: (formulaId: string, batchSize: number, manualPieces?: number) => void
   removeFromMemory: (id: number) => void
   clearMemory: () => void
@@ -39,286 +48,221 @@ interface StockSimContextValue {
 
 const StockSimContext = createContext<StockSimContextValue | null>(null)
 
-export function StockSimulationProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<StockSimulationState>(createInitialState)
+// ---------------------------------------------------------------------------
+// SWR fetcher
+// ---------------------------------------------------------------------------
 
-  const resetAll = useCallback(() => {
-    setState(createInitialState())
-  }, [])
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+/** Revalidate all workflow + movements + stock card caches. */
+function revalidateAll() {
+  globalMutate("/api/stock/workflow")
+  globalMutate("/api/stock/movements")
+  globalMutate("/api/stock/cards")
+}
+
+// ---------------------------------------------------------------------------
+// Fallback state (used while initial fetch is in-flight)
+// ---------------------------------------------------------------------------
+
+function buildFallbackState(): StockSimulationState {
+  return {
+    stock: INIT_STOCK(),
+    purchaseOrders: INIT_POS(),
+    jobReservations: INIT_JOBS(),
+    savedReservations: [],
+    receiveRecords: [],
+    movementLog: [],
+    memoryBank: [],
+    docCounters: { SSI: 0, SRE: 0, SIN: 5, SRR: 0 },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Derive SimulationState from the workflow snapshot
+// ---------------------------------------------------------------------------
+
+function snapshotToState(snap: Record<string, unknown>, movementsData?: Record<string, unknown>): StockSimulationState {
+  const movements: MovementLogEntry[] =
+    ((movementsData?.movements as Array<{
+      movementType: string
+      itemName: string
+      quantity: number
+      referenceNumber: string
+      notes?: string
+      createdAt: string
+    }>) ?? []).map((m) => {
+      const t = m.movementType
+      let type: MovementLogEntry["type"] = "ADJUST"
+      if (["buy_in", "adjust_in", "return", "found"].includes(t)) type = "IN"
+      else if (["use_out", "adjust_out", "damage", "loss", "production"].includes(t)) type = "OUT"
+      else if (t === "reserve" || t === "release") type = "RESERVE"
+      const ts = new Date(m.createdAt)
+        .toLocaleString("sv-SE")
+        .replace("T", " ")
+        .slice(0, 16)
+      return { ts, item: m.itemName, type, qty: m.quantity, ref: m.referenceNumber, note: m.notes ?? "" }
+    })
+
+  return {
+    stock: (snap.stock as StockSimulationState["stock"]) ?? INIT_STOCK(),
+    purchaseOrders: (snap.purchaseOrders as StockSimulationState["purchaseOrders"]) ?? INIT_POS(),
+    jobReservations: (snap.jobReservations as StockSimulationState["jobReservations"]) ?? INIT_JOBS(),
+    savedReservations: (snap.savedReservations as SavedReservation[]) ?? [],
+    receiveRecords: (snap.receiveRecords as StockSimulationState["receiveRecords"]) ?? [],
+    movementLog: movements,
+    memoryBank: [], // always client-only
+    docCounters: (snap.docCounters as StockSimulationState["docCounters"]) ?? { SSI: 0, SRE: 0, SIN: 5, SRR: 0 },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// POST helper
+// ---------------------------------------------------------------------------
+
+async function postWorkflow(body: Record<string, unknown>): Promise<unknown> {
+  const res = await fetch("/api/stock/workflow", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? "Workflow action failed")
+  return data
+}
+
+// ---------------------------------------------------------------------------
+// Provider
+// ---------------------------------------------------------------------------
+
+export function StockSimulationProvider({ children }: { children: ReactNode }) {
+  // Client-only scratchpad
+  const [memoryBank, setMemoryBank] = useState<SimulationBatch[]>([])
+  const [, startTransition] = useTransition()
+
+  // Live data from DB
+  const { data: snapData, isLoading: snapLoading } = useSWR("/api/stock/workflow", fetcher, {
+    refreshInterval: 0,
+    revalidateOnFocus: false,
+  })
+  const { data: movementsData, isLoading: movLoading } = useSWR("/api/stock/movements", fetcher, {
+    refreshInterval: 0,
+    revalidateOnFocus: false,
+  })
+
+  const isLoading = snapLoading || movLoading
+  const baseState = snapData ? snapshotToState(snapData, movementsData) : buildFallbackState()
+  const state: StockSimulationState = { ...baseState, memoryBank }
+
+  // -------------------------------------------------------------------------
+  // Memory bank (client-side scratchpad)
+  // -------------------------------------------------------------------------
 
   const addToMemory = useCallback((formulaId: string, batchSize: number, manualPieces?: number) => {
-    setState((prev) => {
-      const f = FORMULAS[formulaId]
-      if (!f || batchSize <= 0) return prev
-      const derivedPieces = getPiecesFromBatch(formulaId, batchSize)
-      const pieces = manualPieces && manualPieces > 0 ? manualPieces : derivedPieces
-      const batch: SimulationBatch = {
-        id: Date.now() + Math.random(),
-        formulaId,
-        formulaName: f.name,
-        batchSize,
-        pieces,
-        requirements: f.ingredients.map((ing) => ({
-          id: ing.id,
-          qty: calcRequired(ing, batchSize, pieces),
-          isPkg: !!ing.perUnit,
-        })),
-      }
-      return { ...prev, memoryBank: [...prev.memoryBank, batch] }
-    })
+    const f = FORMULAS[formulaId]
+    if (!f || batchSize <= 0) return
+    const derivedPieces = getPiecesFromBatch(formulaId, batchSize)
+    const pieces = manualPieces && manualPieces > 0 ? manualPieces : derivedPieces
+    const batch: SimulationBatch = {
+      id: Date.now() + Math.random(),
+      formulaId,
+      formulaName: f.name,
+      batchSize,
+      pieces,
+      requirements: f.ingredients.map((ing) => ({
+        id: ing.id,
+        qty: calcRequired(ing, batchSize, pieces),
+        isPkg: !!ing.perUnit,
+      })),
+    }
+    setMemoryBank((prev) => [...prev, batch])
   }, [])
 
   const removeFromMemory = useCallback((id: number) => {
-    setState((prev) => ({
-      ...prev,
-      memoryBank: prev.memoryBank.filter((m) => m.id !== id),
-    }))
+    setMemoryBank((prev) => prev.filter((m) => m.id !== id))
   }, [])
 
-  const clearMemory = useCallback(() => {
-    setState((prev) => ({ ...prev, memoryBank: [] }))
-  }, [])
+  const clearMemory = useCallback(() => setMemoryBank([]), [])
+
+  // -------------------------------------------------------------------------
+  // Split & Reserve → server
+  // -------------------------------------------------------------------------
 
   const confirmSplitReservation = useCallback((prefix: string) => {
-    setState((prev) => {
-      const newState = { ...prev }
-      const counters = { ...prev.docCounters }
-      const ssiNo = generateDocNo(counters, "SSI")
-      const newReservations: SavedReservation[] = []
-      const newMovements: MovementLogEntry[] = []
-      const newStock = prev.stock.map((s) => ({ ...s }))
-
-      prev.memoryBank.forEach((sim) => {
-        const sreNo = generateDocNo(counters, "SRE")
-        const name = prefix ? `${prefix} -- ${sim.formulaName}` : sim.formulaName
-
-        newReservations.push({
-          id: sreNo,
-          ssiRef: ssiNo,
-          name,
-          formulaName: sim.formulaName,
-          date: new Date().toLocaleTimeString(),
-          batchData: sim,
-          status: "DRAFT",
-          linkedJo: null,
-        })
-
-        sim.requirements.forEach((req) => {
-          const si = newStock.find((s) => s.id === req.id)
-          if (si) si.reserved += req.qty
-        })
-
-        newMovements.push({
-          ts: nowTimestamp(),
-          item: sim.formulaName,
-          type: "RESERVE",
-          qty: 0,
-          ref: `${ssiNo} -> ${sreNo}`,
-          note: `Reserved ${sim.batchSize}kg batch`,
-        })
-      })
-
-      return {
-        ...newState,
-        stock: newStock,
-        docCounters: counters,
-        memoryBank: [],
-        savedReservations: [...newReservations, ...prev.savedReservations],
-        movementLog: [...newMovements, ...prev.movementLog],
+    if (!memoryBank.length) return
+    const snapshot = [...memoryBank]
+    startTransition(async () => {
+      try {
+        await postWorkflow({ action: "splitReserve", prefix, memoryBank: snapshot })
+        setMemoryBank([])
+        revalidateAll()
+      } catch (e) {
+        console.error("[v0] splitReserve failed:", e)
       }
     })
-  }, [])
+  }, [memoryBank])
+
+  // -------------------------------------------------------------------------
+  // Link reservation → server
+  // -------------------------------------------------------------------------
 
   const linkReservation = useCallback((resId: string, jobNo: string) => {
-    setState((prev) => {
-      const newReservations = prev.savedReservations.map((r) =>
-        r.id === resId ? { ...r, status: "LINKED" as const, linkedJo: jobNo } : r
-      )
-      const res = prev.savedReservations.find((r) => r.id === resId)
-      if (!res) return prev
-
-      const newJobReservations: JobReservation[] = [...prev.jobReservations]
-      res.batchData.requirements.forEach((req) => {
-        const si = getStockItem(prev.stock, req.id)
-        const available = si ? si.balance : 0
-        newJobReservations.push({
-          jobNo,
-          itemCode: req.id,
-          itemName: si?.name || req.id,
-          qtyNeeded: req.qty,
-          qtyAllocated: Math.min(req.qty, available),
-          status: available >= req.qty ? "READY" : "WAITING",
-        })
-      })
-
-      const newMovements: MovementLogEntry[] = [
-        {
-          ts: nowTimestamp(),
-          item: res.formulaName,
-          type: "RESERVE",
-          qty: 0,
-          ref: jobNo,
-          note: `Linked ${resId} -> ${jobNo}`,
-        },
-        ...prev.movementLog,
-      ]
-
-      return {
-        ...prev,
-        savedReservations: newReservations,
-        jobReservations: newJobReservations,
-        movementLog: newMovements,
+    startTransition(async () => {
+      try {
+        await postWorkflow({ action: "linkReservation", resId, jobNo })
+        revalidateAll()
+      } catch (e) {
+        console.error("[v0] linkReservation failed:", e)
       }
     })
   }, [])
+
+  // -------------------------------------------------------------------------
+  // Partial receive → server (by poNo, not index)
+  // -------------------------------------------------------------------------
 
   const confirmPartialReceive = useCallback((poIdx: number, quantities: number[]) => {
-    setState((prev) => {
-      const newPOs = prev.purchaseOrders.map((po) => ({
-        ...po,
-        items: po.items.map((it) => ({ ...it })),
-      }))
-      const po = newPOs[poIdx]
-      if (!po || po.status === "RECEIVED") return prev
+    const po = state.purchaseOrders[poIdx]
+    if (!po) return
+    startTransition(async () => {
+      try {
+        await postWorkflow({ action: "partialReceive", poNo: po.poNo, quantities })
+        revalidateAll()
+      } catch (e) {
+        console.error("[v0] partialReceive failed:", e)
+      }
+    })
+  }, [state.purchaseOrders])
 
-      let anyReceived = false
-      const filledJobs: string[] = []
-      const receivedItems: ReceiveRecord["items"] = []
-      let totalExcess = 0
-      const newStock = prev.stock.map((s) => ({ ...s }))
-      const newJobRes = prev.jobReservations.map((j) => ({ ...j }))
-      const counters = { ...prev.docCounters }
+  // -------------------------------------------------------------------------
+  // Generate PO → server
+  // -------------------------------------------------------------------------
 
-      po.items.forEach((poItem, idx) => {
-        const receiveQty = Math.max(0, quantities[idx] || 0)
-        if (receiveQty <= 0) return
-
-        anyReceived = true
-        const remaining = poItem.qty - (poItem.receivedQty || 0)
-        const excessQty = Math.max(0, receiveQty - remaining)
-        totalExcess += excessQty
-
-        poItem.receivedQty = (poItem.receivedQty || 0) + receiveQty
-        receivedItems.push({
-          itemId: poItem.itemId,
-          name: poItem.name,
-          qty: receiveQty,
-          excessQty,
-        })
-
-        const si = newStock.find((s) => s.id === poItem.itemId)
-        if (si) {
-          si.balance += receiveQty
-          si.incoming = Math.max(0, si.incoming - Math.min(receiveQty, remaining))
-        }
-
-        // FIFO Auto-Allocation
-        const waiting = newJobRes
-          .filter((j) => j.itemCode === poItem.itemId && j.status === "WAITING")
-          .sort((a, b) => a.jobNo.localeCompare(b.jobNo))
-        let remainingBalance = si ? si.balance : 0
-
-        waiting.forEach((j) => {
-          const stillNeeded = j.qtyNeeded - j.qtyAllocated
-          if (remainingBalance >= stillNeeded) {
-            j.qtyAllocated += stillNeeded
-            j.status = "READY"
-            remainingBalance -= stillNeeded
-            if (!filledJobs.includes(j.jobNo)) filledJobs.push(j.jobNo)
-          } else if (remainingBalance > 0) {
-            j.qtyAllocated += remainingBalance
-            remainingBalance = 0
-          }
-        })
-      })
-
-      if (!anyReceived) return prev
-
-      const allDone = po.items.every((it) => (it.receivedQty || 0) >= it.qty)
-      po.status = allDone ? "RECEIVED" : "PARTIAL"
-
-      const srrNo = generateDocNo(counters, "SRR")
-      const hasExcess = totalExcess > 0
-      const newReceiveRecords: ReceiveRecord[] = [
-        {
-          srrNo,
-          sinRef: po.poNo,
-          supplier: po.supplier,
-          items: receivedItems,
-          receivedAt: nowTimestamp(),
-          isPartial: !allDone,
-          hasExcess,
-          totalExcess,
-          note: hasExcess ? `Received with excess (+${totalExcess})` : allDone ? "Full receive" : "Partial receive",
-        },
-        ...prev.receiveRecords,
-      ]
-
-      const newMovements: MovementLogEntry[] = receivedItems.map((ri) => ({
-        ts: nowTimestamp(),
-        item: ri.name,
-        type: "IN" as const,
-        qty: ri.qty,
-        ref: srrNo,
-        note: `${allDone ? "Full" : "Partial"} Receive from ${po.poNo}${ri.excessQty > 0 ? ` (excess +${ri.excessQty})` : ""}`,
-      }))
-
-      return {
-        ...prev,
-        stock: newStock,
-        purchaseOrders: newPOs,
-        jobReservations: newJobRes,
-        receiveRecords: newReceiveRecords,
-        movementLog: [...newMovements, ...prev.movementLog],
-        docCounters: counters,
+  const generatePOForItem = useCallback((itemId: string, shortageQty: number, orderQty: number) => {
+    startTransition(async () => {
+      try {
+        await postWorkflow({ action: "generatePO", itemId, shortageQty, orderQty })
+        revalidateAll()
+      } catch (e) {
+        console.error("[v0] generatePO failed:", e)
       }
     })
   }, [])
 
-  const generatePOForItem = useCallback((itemId: string, shortageQty: number, orderQty: number) => {
-    setState((prev) => {
-      const si = getStockItem(prev.stock, itemId)
-      if (!si) return prev
+  // -------------------------------------------------------------------------
+  // Reset
+  // -------------------------------------------------------------------------
 
-      const counters = { ...prev.docCounters }
-      const poNo = generateDocNo(counters, "SIN")
-      const extraQty = Math.max(0, orderQty - shortageQty)
-      const newStock = prev.stock.map((s) => (s.id === itemId ? { ...s, incoming: s.incoming + orderQty } : s))
-
-      const newPO: PurchaseOrder = {
-        poNo,
-        supplier: si.supplier,
-        items: [{ itemId: si.id, name: si.name, qty: orderQty, receivedQty: 0, shortageQty: Math.min(shortageQty, orderQty), extraQty }],
-        status: "PENDING",
-        eta: getEstDate(7),
-        autoGenerated: true,
-        reason: "shortage",
-        extraNote: extraQty > 0 ? `Extra +${extraQty}` : null,
-      }
-
-      const newMovement: MovementLogEntry = {
-        ts: nowTimestamp(),
-        item: si.name,
-        type: "RESERVE",
-        qty: 0,
-        ref: poNo,
-        note: `Ordered ${orderQty} ${si.unit}${extraQty > 0 ? ` (shortage ${Math.min(shortageQty, orderQty)} + extra ${extraQty})` : " (shortage)"}`,
-      }
-
-      return {
-        ...prev,
-        stock: newStock,
-        purchaseOrders: [...prev.purchaseOrders, newPO],
-        movementLog: [newMovement, ...prev.movementLog],
-        docCounters: counters,
-      }
-    })
+  const resetAll = useCallback(() => {
+    setMemoryBank([])
+    fetch("/api/seed?reset=1", { method: "POST" }).then(() => revalidateAll())
   }, [])
 
   return (
     <StockSimContext.Provider
       value={{
         state,
+        isLoading,
         resetAll,
         addToMemory,
         removeFromMemory,

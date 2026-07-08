@@ -1,4 +1,4 @@
-import { db } from "@/lib/db"
+import { db, type Tx } from "@/lib/db"
 import {
   stockCards,
   stockMovements,
@@ -48,7 +48,7 @@ function estDate(days: number): string {
 const WORKFLOW_ID = "default"
 
 /** Load (creating if needed) the single workflow row. */
-async function loadWorkflowRow(tx: typeof db): Promise<SimWorkflowRow> {
+async function loadWorkflowRow(tx: Tx | typeof db): Promise<SimWorkflowRow> {
   const [row] = await tx.select().from(simWorkflow).where(eq(simWorkflow.id, WORKFLOW_ID)).limit(1)
   if (row) return row
   const [created] = await tx.insert(simWorkflow).values({ id: WORKFLOW_ID }).returning()
@@ -57,7 +57,7 @@ async function loadWorkflowRow(tx: typeof db): Promise<SimWorkflowRow> {
 
 /** Append a ledger entry to stock_movements. */
 async function appendMovement(
-  tx: typeof db,
+  tx: Tx,
   entry: {
     movementType: string
     stockCardId?: string | null
@@ -84,7 +84,7 @@ async function appendMovement(
 
 /** Recompute + persist a stock card's balance/reserved/incoming/ATP/status. */
 async function patchCard(
-  tx: typeof db,
+  tx: Tx,
   card: { id: string; minStock: number; maxStock: number },
   next: { balance: number; reserved: number; incoming: number },
 ) {
