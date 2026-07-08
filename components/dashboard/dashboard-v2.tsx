@@ -171,13 +171,13 @@ export function DashboardV2() {
 
     /* Recent JOs */
     const recentJO = [...mockJobOrders]
-      .sort((a, b) => new Date(b.plannedStartDate).getTime() - new Date(a.plannedStartDate).getTime())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5)
 
     /* Alerts */
     const alerts = [
       ...mockFdaList.filter(f => f.status === "expired").slice(0, 2).map(f => ({
-        id: f.id, type: "fda" as const, label: f.productName, sub: "FDA Expired",
+        id: f.id, type: "fda" as const, label: f.productNameEn ?? f.productNameTh, sub: "FDA Expired",
         color: P.pinkdark, bg: P.pinkbg,
       })),
       ...mockStockCards.filter(s => s.inventoryStatus === "out_of_stock").slice(0, 2).map(s => ({
@@ -188,10 +188,10 @@ export function DashboardV2() {
 
     return {
       kpis: [
-        { label: "Active Job Orders", value: String(activeJO.length), sub: `${inProd} in production`, icon: ClipboardList, iconColor: P.skydark, iconBg: P.skybg, positive: true },
-        { label: "Revenue (THB)", value: revFmt, sub: `${mockJobOrders.length} total orders`, icon: BarChart3, iconColor: P.lavenderdark, iconBg: P.lavenderbg, positive: true },
-        { label: "Stock Items", value: String(mockStockCards.length), sub: outStock > 0 ? `${outStock} out • ${lowStock} low` : "All healthy", icon: Package, iconColor: P.peachdark, iconBg: P.peachbg, positive: outStock === 0 },
-        { label: "Delivery Pipeline", value: String(pipeline.length), sub: `${mockDeliveryOrders.filter(d => d.status === "shipped").length} shipped`, icon: Truck, iconColor: P.mintdark, iconBg: P.mintbg, positive: true },
+        { label: "Active Job Orders", value: String(activeJO.length), sub: `${inProd} in production`, icon: ClipboardList, iconColor: P.skydark, iconBg: P.skybg, accentColor: P.skydark, positive: true },
+        { label: "Revenue (THB)", value: revFmt, sub: `${mockJobOrders.length} total orders`, icon: BarChart3, iconColor: P.lavenderdark, iconBg: P.lavenderbg, accentColor: P.lavenderdark, positive: true },
+        { label: "Stock Items", value: String(mockStockCards.length), sub: outStock > 0 ? `${outStock} out • ${lowStock} low` : "All healthy", icon: Package, iconColor: P.peachdark, iconBg: P.peachbg, accentColor: P.peachdark, positive: outStock === 0 },
+        { label: "Delivery Pipeline", value: String(pipeline.length), sub: `${mockDeliveryOrders.filter(d => d.status === "shipped").length} shipped`, icon: Truck, iconColor: P.mintdark, iconBg: P.mintbg, accentColor: P.mintdark, positive: true },
       ],
       joStatusData, formulaTypeData, recentJO, alerts,
     }

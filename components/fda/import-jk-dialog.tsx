@@ -48,7 +48,7 @@ export function ImportJkDialog({ open, onOpenChange, onImportComplete }: ImportJ
     for (let i = 1; i <= pdf.numPages; i++) {
       const pg = await pdf.getPage(i)
       const tc = await pg.getTextContent()
-      txt += tc.items.map((it: { str?: string }) => ("str" in it ? it.str : "")).join(" ") + "\n"
+      txt += tc.items.map((it) => ("str" in it ? it.str : "")).join(" ") + "\n"
     }
     return txt
   }, [])

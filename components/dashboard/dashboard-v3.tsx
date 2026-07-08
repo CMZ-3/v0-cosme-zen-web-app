@@ -24,9 +24,9 @@ import Link from "next/link"
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
 
 function getDerivedData() {
-  const activeJOs = mockJobOrders.filter((j) => j.status === "in_progress").length
-  const pendingJOs = mockJobOrders.filter((j) => j.status === "pending").length
-  const completedJOs = mockJobOrders.filter((j) => j.status === "completed").length
+  const activeJOs = mockJobOrders.filter((j) => j.status === "in_production").length
+  const pendingJOs = mockJobOrders.filter((j) => j.status === "new" || j.status === "preparing_rm").length
+  const completedJOs = mockJobOrders.filter((j) => j.status === "delivered").length
   const totalJOs = mockJobOrders.length
 
   const totalRevenue = mockJobOrders.reduce((a, j) => a + (j.totalValue ?? 0), 0)
@@ -35,7 +35,7 @@ function getDerivedData() {
   const inTransit = mockDeliveryOrders.filter((d) => d.status === "shipped").length
   const delivered = mockDeliveryOrders.filter((d) => d.status === "delivered").length
 
-  const lowStock = mockStockCards.filter((s) => s.inventoryStatus === "low_stock").length
+  const lowStock = mockStockCards.filter((s) => s.inventoryStatus === "low").length
   const outOfStock = mockStockCards.filter((s) => s.inventoryStatus === "out_of_stock").length
 
   const pendingFDA = mockFdaList.filter((f) => f.status === "submitted" || f.status === "draft").length
@@ -147,7 +147,7 @@ export function DashboardV3() {
   const recentActivities = [
     { label: "JO Completed", detail: mockJobOrders[0]?.orderNumber ?? "JO-001", value: "+฿" + ((mockJobOrders[0]?.totalValue ?? 0) / 1000).toFixed(0) + "K", color: "#10b981", date: "Today" },
     { label: "Delivery Shipped", detail: mockDeliveryOrders[0]?.deliveryNumber ?? "DO-001", value: mockDeliveryOrders[0]?.customerName ?? "—", color: "#2563eb", date: "Today" },
-    { label: "FDA Submitted", detail: mockFdaList[0]?.productName ?? "—", value: "Pending", color: "#f97316", date: "Yesterday" },
+    { label: "FDA Submitted", detail: mockFdaList[0]?.productNameEn ?? mockFdaList[0]?.productNameTh ?? "—", value: "Pending", color: "#f97316", date: "Yesterday" },
     { label: "Stock Alert", detail: `${data.lowStock} items low`, value: "Action needed", color: "#ef4444", date: "Yesterday" },
     { label: "New JO Created", detail: mockJobOrders[1]?.orderNumber ?? "JO-002", value: "+฿" + ((mockJobOrders[1]?.totalValue ?? 0) / 1000).toFixed(0) + "K", color: "#8b5cf6", date: "2d ago" },
   ]

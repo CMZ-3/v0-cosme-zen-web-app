@@ -22,7 +22,7 @@ export function StockKpiCards({ data }: StockKpiCardsProps) {
     if (key === "healthy") return data.statusBreakdown.healthy
     if (key === "low") return data.statusBreakdown.low
     if (key === "outOfStock") return data.statusBreakdown.outOfStock
-    return (data as Record<string, number>)[key] ?? 0
+    return (data as unknown as Record<string, number>)[key] ?? 0
   }
 
   return (

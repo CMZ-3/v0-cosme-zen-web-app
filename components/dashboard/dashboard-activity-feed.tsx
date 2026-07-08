@@ -56,9 +56,9 @@ export function DashboardActivityFeed() {
         iconBg: "bg-blue-50",
         title: `${jo.orderNumber} ${statusLabelMap[jo.status] || jo.status}`,
         description: `${jo.customerName} - ${jo.productName} (${jo.quantity.toLocaleString()} pcs)`,
-        time: jo.createdDate || "",
+        time: jo.createdAt || "",
         module: "Job Orders",
-        sortDate: jo.createdDate || "",
+        sortDate: jo.createdAt || "",
       })
     })
 
@@ -71,9 +71,9 @@ export function DashboardActivityFeed() {
         iconBg: "bg-violet-50",
         title: `${d.deliveryNumber} ${statusLabelMap[d.status] || d.status}`,
         description: `${d.customerName}${d.trackingNumber ? ` - ${d.trackingNumber}` : ""}`,
-        time: d.createdDate || "",
+        time: d.createdAt || "",
         module: "Delivery",
-        sortDate: d.createdDate || "",
+        sortDate: d.createdAt || "",
       })
     })
 
@@ -97,13 +97,13 @@ export function DashboardActivityFeed() {
       items.push({
         id: `stk-${m.id}`,
         icon: m.movementType === "transfer" ? ArrowLeftRight : Package,
-        iconColor: m.movementType === "buy_in" ? "text-emerald-600" : m.movementType === "issue" ? "text-red-500" : "text-amber-600",
-        iconBg: m.movementType === "buy_in" ? "bg-emerald-50" : m.movementType === "issue" ? "bg-red-50" : "bg-amber-50",
-        title: `${m.referenceNo} ${statusLabelMap[m.movementType] || m.movementType}`,
-        description: `${m.itemName} ${m.qty > 0 ? "+" : ""}${m.qty} ${m.unit}`,
-        time: m.date || "",
+        iconColor: m.movementType === "buy_in" ? "text-emerald-600" : m.movementType === "use_out" ? "text-red-500" : "text-amber-600",
+        iconBg: m.movementType === "buy_in" ? "bg-emerald-50" : m.movementType === "use_out" ? "bg-red-50" : "bg-amber-50",
+        title: `${m.referenceNumber} ${statusLabelMap[m.movementType] || m.movementType}`,
+        description: `${m.itemName} ${m.quantity.toLocaleString()}`,
+        time: m.createdAt || "",
         module: "Stock",
-        sortDate: m.date || "",
+        sortDate: m.createdAt || "",
       })
     })
 
@@ -116,9 +116,9 @@ export function DashboardActivityFeed() {
         iconBg: "bg-cyan-50",
         title: `${f.formulaCode} ${f.status}`,
         description: `${f.formulaName}`,
-        time: f.updatedDate || f.createdDate || "",
+        time: f.updatedAt || f.createdAt || "",
         module: "Formulas",
-        sortDate: f.updatedDate || f.createdDate || "",
+        sortDate: f.updatedAt || f.createdAt || "",
       })
     })
 

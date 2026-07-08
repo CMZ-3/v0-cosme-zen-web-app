@@ -1,12 +1,26 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { Suspense, useState, useMemo } from "react"
+import { useSearchParams } from "next/navigation"
 import { JobOrderListPanel } from "@/components/job-orders/job-order-list-panel"
 import { JobOrderDetail } from "@/components/job-orders/job-order-detail"
 import { mockJobOrders } from "@/lib/job-order-mock-data"
 
 export default function JobOrdersPage() {
-  const [selectedId, setSelectedId] = useState<string>(mockJobOrders[0]?.id ?? "")
+  return (
+    <Suspense fallback={null}>
+      <JobOrdersView />
+    </Suspense>
+  )
+}
+
+function JobOrdersView() {
+  const searchParams = useSearchParams()
+  const idFromQuery = searchParams.get("id")
+  const initialId = mockJobOrders.some((jo) => jo.id === idFromQuery)
+    ? (idFromQuery as string)
+    : mockJobOrders[0]?.id ?? ""
+  const [selectedId, setSelectedId] = useState<string>(initialId)
   const selectedJO = useMemo(() => mockJobOrders.find((jo) => jo.id === selectedId), [selectedId])
 
   return (

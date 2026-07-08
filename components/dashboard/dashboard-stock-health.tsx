@@ -29,7 +29,7 @@ export function DashboardStockHealth() {
       <CardHeader className="flex-row items-center justify-between pb-2 space-y-0">
         <div>
           <CardTitle className="text-sm font-extrabold text-foreground">{"Stock Health"}</CardTitle>
-          <p className="text-[11px] text-muted-foreground mt-0.5">{`${(totalInventoryValue / 1e6).toFixed(1)}M THB inventory`}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">{`${((totalInventoryValue ?? 0) / 1e6).toFixed(1)}M THB inventory`}</p>
         </div>
         <Link href="/stock" className="flex items-center gap-1 text-[11px] font-bold text-primary hover:underline">
           {"View all"}<ArrowRight className="h-3 w-3" />

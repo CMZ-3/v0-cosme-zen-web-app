@@ -69,7 +69,7 @@ export function DashboardRevenueChart() {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={(v: number) => `${(v / 1e6).toFixed(1)}M`} tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
-              <ChartTooltip content={<ChartTooltipContent formatter={(v: number) => `${(v as number).toLocaleString()} THB`} />} />
+              <ChartTooltip content={<ChartTooltipContent formatter={(v) => `${Number(v).toLocaleString()} THB`} />} />
               <Area type="monotone" dataKey="revenue" stroke={BLUE} strokeWidth={2.5} fill="url(#gRevenue)" />
               <Area type="monotone" dataKey="cost" stroke={GREEN} strokeWidth={2} fill="url(#gCost)" strokeDasharray="5 3" />
             </AreaChart>
