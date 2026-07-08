@@ -32,6 +32,7 @@ import {
   mockAlerts,
   mockReservations,
 } from "@/lib/stock-mock-data"
+import { useStockCards, useStockMovements } from "@/lib/hooks/use-stock"
 import { cn } from "@/lib/utils"
 
 type StockTab = "overview" | "simulator" | "reserved" | "incoming" | "receive" | "movements" | "alerts" | "guide"
@@ -49,6 +50,13 @@ const tabs: { key: StockTab; label: string; icon: typeof BarChart3; badge?: numb
 
 export function StockListPage() {
   const [activeTab, setActiveTab] = useState<StockTab>("overview")
+
+  // Live data from the database (Neon). Fall back to mock while loading or on
+  // error so the UI never blanks out during fetch.
+  const { cards, isLoading: cardsLoading } = useStockCards()
+  const { movements, isLoading: movementsLoading } = useStockMovements()
+  const liveCards = cards.length > 0 ? cards : mockStockCards
+  const liveMovements = movements.length > 0 ? movements : mockStockMovements
 
   return (
     <StockSimulationProvider>
@@ -120,7 +128,10 @@ export function StockListPage() {
                     actual quantity ready for use / sales commitment
                   </div>
                 </div>
-                <StockOverviewTable data={mockStockCards} />
+                <StockOverviewTable data={liveCards} />
+                {cardsLoading && (
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground">Syncing with database…</p>
+                )}
               </div>
             )}
 
@@ -150,7 +161,10 @@ export function StockListPage() {
 
             {activeTab === "movements" && (
               <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-                <StockMovementsTab data={mockStockMovements} />
+                <StockMovementsTab data={liveMovements} />
+                {movementsLoading && (
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground">Syncing with database…</p>
+                )}
               </div>
             )}
 

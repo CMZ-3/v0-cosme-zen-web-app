@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BarcodeSVG } from "@/components/barcode/barcode-svg"
 import { resolveBarcodeValue } from "@/lib/barcode-utils"
+import { useStockCard } from "@/lib/hooks/use-stock"
 import {
   mockStockCards, mockStockMovements, mockStockLots, mockReservations, mockLinkedProducts,
 } from "@/lib/stock-mock-data"
@@ -29,7 +30,13 @@ import { AvailabilityBar } from "@/components/stock/availability-bar"
 export default function StockDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const card = mockStockCards.find((c) => c.id === params.id)
+  const cardId = typeof params.id === "string" ? params.id : null
+
+  // Live single-card record (card + lots + movements + reservations) from the
+  // database, with mock fallback while loading or if the row isn't seeded yet.
+  const { card: liveCard, lots: liveLots, movements: liveMovements, reservations: liveReservations } =
+    useStockCard(cardId)
+  const card = liveCard ?? mockStockCards.find((c) => c.id === params.id)
 
   // Movement approval state -- spec 3.2: pending → approved, approved → reversed
   const [movementStatuses, setMovementStatuses] = useState<Record<string, string>>({})
@@ -57,9 +64,10 @@ export default function StockDetailPage() {
     )
   }
 
-  const cardMovements = mockStockMovements.filter((m) => m.stockCardId === card.id)
-  const cardLots = mockStockLots.filter((l) => l.stockCardId === card.id)
-  const cardReservations = mockReservations.filter((r) => r.stockCardId === card.id)
+  // Prefer live related data; fall back to mock filtered by card id.
+  const cardMovements = liveMovements.length > 0 ? liveMovements : mockStockMovements.filter((m) => m.stockCardId === card.id)
+  const cardLots = liveLots.length > 0 ? liveLots : mockStockLots.filter((l) => l.stockCardId === card.id)
+  const cardReservations = liveReservations.length > 0 ? liveReservations : mockReservations.filter((r) => r.stockCardId === card.id)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
