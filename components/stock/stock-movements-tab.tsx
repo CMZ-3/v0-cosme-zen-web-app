@@ -94,26 +94,35 @@ export function StockMovementsTab({ data }: StockMovementsTabProps) {
               </tr>
             ) : (
               filtered.map((mv) => {
-                const isIncoming = ["buy_in", "adjust_in", "return", "found"].includes(mv.movementType)
+                const isIncoming = ["buy_in", "adjust_in", "return", "found", "release"].includes(mv.movementType)
+                const isNeutral = ["reserve", "transfer"].includes(mv.movementType)
+                const typeLabel = movementTypeLabels[mv.movementType] ?? mv.movementType
+                const typeColor = movementTypeColors[mv.movementType] ?? "bg-zinc-100 text-zinc-600"
+                const sign = isNeutral ? "" : isIncoming ? "+" : "-"
+                const qtyColor = isNeutral
+                  ? "text-amber-600"
+                  : isIncoming
+                  ? "text-emerald-600"
+                  : "text-red-600"
                 return (
                   <tr key={mv.id} className="border-b border-border transition-colors hover:bg-primary/[0.02]">
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-md">{mv.referenceNumber}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant="outline" className={`text-[10px] px-2 py-0.5 rounded-lg border-0 font-semibold ${movementTypeColors[mv.movementType]}`}>
-                        {isIncoming ? "+" : "-"} {movementTypeLabels[mv.movementType]}
+                      <Badge variant="outline" className={`text-[10px] px-2 py-0.5 rounded-lg border-0 font-semibold ${typeColor}`}>
+                        {sign && `${sign} `}{typeLabel}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-mono text-[11px] text-primary">{mv.itemCode}</span>
+                        {mv.itemCode && <span className="font-mono text-[11px] text-primary">{mv.itemCode}</span>}
                         <span className="text-xs text-muted-foreground">{mv.itemName}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`font-mono text-xs font-bold ${isIncoming ? "text-emerald-600" : "text-red-600"}`}>
-                        {isIncoming ? "+" : "-"}{mv.quantity.toLocaleString()}
+                      <span className={`font-mono text-xs font-bold ${qtyColor}`}>
+                        {sign}{mv.quantity.toLocaleString()}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">

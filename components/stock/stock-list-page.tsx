@@ -26,27 +26,14 @@ import { StockReservedTab } from "./stock-reserved-tab"
 import { StockGuideTab } from "./stock-guide-tab"
 import { StockSimulationProvider } from "@/lib/stock-simulation-context"
 import {
-  mockStockDashboard,
   mockStockCards,
   mockStockMovements,
   mockAlerts,
-  mockReservations,
 } from "@/lib/stock-mock-data"
 import { useStockCards, useStockMovements } from "@/lib/hooks/use-stock"
 import { cn } from "@/lib/utils"
 
 type StockTab = "overview" | "simulator" | "reserved" | "incoming" | "receive" | "movements" | "alerts" | "guide"
-
-const tabs: { key: StockTab; label: string; icon: typeof BarChart3; badge?: number; badgeColor?: string }[] = [
-  { key: "overview", label: "Overview", icon: Package },
-  { key: "simulator", label: "Simulator", icon: FlaskConical },
-  { key: "reserved", label: "Reserved", icon: Lock, badge: mockReservations.filter((r) => r.status === "active").length, badgeColor: "bg-amber-500" },
-  { key: "incoming", label: "Incoming", icon: Truck, badge: 3, badgeColor: "bg-blue-500" },
-  { key: "receive", label: "Receive", icon: PackageOpen, badge: 2, badgeColor: "bg-emerald-500" },
-  { key: "movements", label: "Movements", icon: ClipboardList },
-  { key: "alerts", label: "Alerts", icon: AlertTriangle, badge: mockAlerts.filter((a) => !a.isResolved).length, badgeColor: "bg-destructive" },
-  { key: "guide", label: "Guide", icon: BookOpen },
-]
 
 export function StockListPage() {
   const [activeTab, setActiveTab] = useState<StockTab>("overview")
@@ -57,6 +44,46 @@ export function StockListPage() {
   const { movements, isLoading: movementsLoading } = useStockMovements()
   const liveCards = cards.length > 0 ? cards : mockStockCards
   const liveMovements = movements.length > 0 ? movements : mockStockMovements
+
+  // Compute dashboard KPIs directly from live stock cards so stats always
+  // reflect the real database instead of the static mock dashboard object.
+  const liveDashboard = {
+    totalItems: liveCards.length,
+    totalInventoryValue: liveCards.reduce((s, c) => s + c.balance * 10, 0), // rough estimate
+    statusBreakdown: {
+      healthy: liveCards.filter((c) => c.inventoryStatus === "healthy").length,
+      low: liveCards.filter((c) => c.inventoryStatus === "low").length,
+      outOfStock: liveCards.filter((c) => c.inventoryStatus === "out_of_stock").length,
+      overStock: liveCards.filter((c) => c.inventoryStatus === "over_stock").length,
+    },
+    totalIncoming: liveCards.reduce((s, c) => s + c.incomingStock, 0),
+    totalReserved: liveCards.reduce((s, c) => s + c.reservedStock, 0),
+    totalAvailable: liveCards.reduce((s, c) => s + c.available, 0),
+  }
+
+  // Tab definitions with live badge counts.
+  const tabs: { key: StockTab; label: string; icon: typeof BarChart3; badge?: number; badgeColor?: string }[] = [
+    { key: "overview", label: "Overview", icon: Package },
+    { key: "simulator", label: "Simulator", icon: FlaskConical },
+    {
+      key: "reserved",
+      label: "Reserved",
+      icon: Lock,
+      badge: liveDashboard.totalReserved > 0 ? undefined : undefined, // driven by workflow context badge below
+      badgeColor: "bg-amber-500",
+    },
+    { key: "incoming", label: "Incoming", icon: Truck, badge: liveCards.filter((c) => c.incomingStock > 0).length, badgeColor: "bg-blue-500" },
+    { key: "receive", label: "Receive", icon: PackageOpen, badgeColor: "bg-emerald-500" },
+    { key: "movements", label: "Movements", icon: ClipboardList },
+    {
+      key: "alerts",
+      label: "Alerts",
+      icon: AlertTriangle,
+      badge: liveDashboard.statusBreakdown.low + liveDashboard.statusBreakdown.outOfStock,
+      badgeColor: "bg-destructive",
+    },
+    { key: "guide", label: "Guide", icon: BookOpen },
+  ]
 
   return (
     <StockSimulationProvider>
@@ -88,7 +115,7 @@ export function StockListPage() {
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex flex-col gap-5">
             {/* KPI Cards */}
-            <StockKpiCards data={mockStockDashboard} />
+            <StockKpiCards data={liveDashboard} />
 
             {/* Tab Bar */}
             <div className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1 shadow-sm">

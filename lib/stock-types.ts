@@ -52,6 +52,7 @@ export interface StockDashboard {
 export type MovementType =
   | "buy_in" | "use_out" | "adjust_in" | "adjust_out"
   | "transfer" | "production" | "return" | "damage" | "loss" | "found"
+  | "reserve" | "release"
 
 export type MovementStatus = "draft" | "pending" | "approved" | "rejected"
 
@@ -195,6 +196,8 @@ export const movementTypeLabels: Record<MovementType, string> = {
   damage: "Damage",
   loss: "Loss",
   found: "Found",
+  reserve: "Reserve",
+  release: "Release",
 }
 
 export const movementTypeColors: Record<MovementType, string> = {
@@ -208,6 +211,8 @@ export const movementTypeColors: Record<MovementType, string> = {
   damage: "bg-red-100 text-red-700",
   loss: "bg-pink-100 text-pink-700",
   transfer: "bg-blue-100 text-blue-700",
+  reserve: "bg-amber-100 text-amber-700",
+  release: "bg-sky-100 text-sky-700",
 }
 
 export const movementStatusColors: Record<MovementStatus, string> = {
