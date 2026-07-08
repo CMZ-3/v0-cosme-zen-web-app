@@ -20,6 +20,7 @@ import { toast } from "sonner"
 interface CreateFormulaDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCreated?: () => void
 }
 
 // Tabs matching FormulaFormPage structure
@@ -54,8 +55,9 @@ interface PhaseRow {
   temperature: string
 }
 
-export function CreateFormulaDialog({ open, onOpenChange }: CreateFormulaDialogProps) {
+export function CreateFormulaDialog({ open, onOpenChange, onCreated }: CreateFormulaDialogProps) {
   const [activeTab, setActiveTab] = useState<TabId>("info")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   
   // Form state - Basic Info
   const [formulaNameTh, setFormulaNameTh] = useState("")
@@ -144,11 +146,46 @@ export function CreateFormulaDialog({ open, onOpenChange }: CreateFormulaDialogP
     }, 200)
   }
 
-  const handleCreate = () => {
-    toast.success("Formula created successfully!", {
-      description: `${formulaNameTh || formulaNameEn || "New Formula"} has been created as a draft.`
-    })
-    handleClose()
+  const handleCreate = async () => {
+    const name = formulaNameTh.trim() || formulaNameEn.trim()
+    if (!name) {
+      toast.error("Formula name is required")
+      setActiveTab("info")
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      const res = await fetch("/api/formulas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          nameEn: formulaNameEn.trim() || undefined,
+          category: productType || category || "body_wash",
+          batchSizeKg: parseFloat(batchSize) || 10,
+          notes: internalNotes.trim() || undefined,
+          ingredients: ingredients
+            .filter((i) => i.name.trim())
+            .map((i, idx) => ({
+              rawMaterialName: i.name.trim(),
+              percentage: parseFloat(i.percentage) || 0,
+            })),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? "Failed to create formula")
+      }
+      toast.success("Formula created!", {
+        description: `${name} has been saved as active.`,
+      })
+      handleClose()
+      onCreated?.()
+    } catch (e) {
+      toast.error("Error creating formula", { description: String(e) })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const addIngredient = () => {
@@ -836,8 +873,13 @@ export function CreateFormulaDialog({ open, onOpenChange }: CreateFormulaDialogP
               Next <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           ) : (
-            <Button size="sm" className="rounded-lg text-[12px] bg-violet-600 hover:bg-violet-700 text-white" onClick={handleCreate}>
-              Create Formula
+            <Button
+              size="sm"
+              className="rounded-lg text-[12px] bg-violet-600 hover:bg-violet-700 text-white"
+              onClick={handleCreate}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Creating..." : "Create Formula"}
             </Button>
           )}
         </DialogFooter>

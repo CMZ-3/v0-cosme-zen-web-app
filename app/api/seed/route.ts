@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { stockCards, stockLots, stockMovements, stockReservations, simWorkflow } from "@/lib/db/schema"
+import { stockCards, stockLots, stockMovements, stockReservations, simWorkflow, formulas, formulaIngredients, jobOrders } from "@/lib/db/schema"
 import { INIT_STOCK, INIT_POS, INIT_JOBS, INIT_MOVEMENTS } from "@/lib/stock-simulation-store"
 import { stockItemToCardValues } from "@/lib/db/sim-mapping"
+import { NEW_STOCK_CARDS, FORMULA_ROWS, INGREDIENT_ROWS, JOB_ORDER_ROWS } from "@/lib/db/formula-seed-data"
 import type { StockItem } from "@/lib/stock-types"
 
 // Reset + seed the unified stock catalog. This REPLACES all stock rows with the
@@ -68,12 +69,96 @@ export async function POST(req: Request) {
       })
     })
 
+    // Seed formula module if requested (or on full reset).
+    await seedFormulas()
+
     return NextResponse.json({
       ok: true,
-      seeded: { stockCards: cardRows.length, stockMovements: movementRows.length, simWorkflow: 1 },
+      seeded: {
+        stockCards: cardRows.length,
+        stockMovements: movementRows.length,
+        simWorkflow: 1,
+        formulas: FORMULA_ROWS.length,
+        formulaIngredients: INGREDIENT_ROWS.length,
+        jobOrders: JOB_ORDER_ROWS.length,
+      },
     })
   } catch (err) {
     console.error("[v0] seed error:", err)
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
   }
+}
+
+// GET ?part=formulas — re-seed only formulas/ingredients/job_orders + new stock cards.
+export async function GET(req: Request) {
+  try {
+    const url = new URL(req.url)
+    if (url.searchParams.get("part") !== "formulas") {
+      return NextResponse.json({ ok: false, error: "Use ?part=formulas" }, { status: 400 })
+    }
+    await seedFormulas()
+    return NextResponse.json({
+      ok: true,
+      seeded: { formulas: FORMULA_ROWS.length, formulaIngredients: INGREDIENT_ROWS.length, jobOrders: JOB_ORDER_ROWS.length },
+    })
+  } catch (err) {
+    console.error("[v0] formula seed error:", err)
+    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
+  }
+}
+
+async function seedFormulas() {
+  await db.transaction(async (tx) => {
+    // Upsert the 6 new shared-ingredient stock cards (do not touch existing ones).
+    for (const card of NEW_STOCK_CARDS) {
+      await tx
+        .insert(stockCards)
+        .values({
+          ...card,
+          status: "active",
+          barcode: `BC-${card.itemCode}`,
+          defaultLot: `LOT-${card.id}-001`,
+        })
+        .onConflictDoNothing()
+    }
+
+    // Replace all formula data on every seed.
+    await tx.delete(jobOrders)
+    await tx.delete(formulaIngredients)
+    await tx.delete(formulas)
+
+    await tx.insert(formulas).values(FORMULA_ROWS)
+    await tx.insert(formulaIngredients).values(
+      INGREDIENT_ROWS.map((r) => ({
+        ...r,
+        stockCardId: r.stockCardId ?? null,
+        notes: r.notes ?? null,
+      })),
+    )
+    await tx.insert(jobOrders).values(
+      JOB_ORDER_ROWS.map((r) => ({
+        id: r.id,
+        jobNo: r.jobNo,
+        formulaId: r.formulaId,
+        formulaName: r.formulaName,
+        formulaCode: r.formulaCode,
+        customer: r.customer,
+        batchSizeKg: r.batchSizeKg,
+        plannedQty: r.plannedQty,
+        unit: r.unit,
+        status: r.status,
+        priority: r.priority,
+        plannedStart: r.plannedStart ?? null,
+        plannedEnd: r.plannedEnd ?? null,
+        actualStart: ("actualStart" in r ? r.actualStart as string : null) ?? null,
+        actualEnd: ("actualEnd" in r ? r.actualEnd as string : null) ?? null,
+        assignedTo: r.assignedTo ?? null,
+        productionNotes: null,
+        materials: [],
+        batches: [],
+        qcResults: [],
+        costBreakdown: {},
+      })),
+    )
+  })
 }

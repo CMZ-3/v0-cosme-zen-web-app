@@ -102,6 +102,67 @@ export const stockReservations = pgTable("stock_reservations", {
   releasedAt: timestamp("releasedAt", { withTimezone: true }),
 })
 
+// ============================================================
+// Formula & Job Order Module tables
+// ============================================================
+
+export const formulas = pgTable("formulas", {
+  id: text("id").primaryKey(),
+  code: text("code").notNull(),
+  name: text("name").notNull(),
+  nameEn: text("nameEn"),
+  category: text("category").notNull().default("body_wash"),
+  base: text("base"),
+  batchSizeKg: doublePrecision("batchSizeKg").notNull().default(10),
+  yield: doublePrecision("yield").notNull().default(100),
+  status: text("status").notNull().default("active"), // active | archived | draft
+  version: text("version").notNull().default("1.0"),
+  registrationNo: text("registrationNo"),
+  productionSteps: jsonb("productionSteps").notNull().default([]),
+  qcStandards: jsonb("qcStandards").notNull().default({}),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const formulaIngredients = pgTable("formula_ingredients", {
+  id: text("id").primaryKey(),
+  formulaId: text("formulaId").notNull(),
+  sortOrder: integer("sortOrder").notNull().default(0),
+  rawMaterialName: text("rawMaterialName").notNull(),
+  supplier: text("supplier"),
+  percentage: doublePrecision("percentage").notNull(),
+  stockCardId: text("stockCardId"), // nullable — links to stock_cards when available
+  unit: text("unit").notNull().default("kg"),
+  notes: text("notes"),
+})
+
+export const jobOrders = pgTable("job_orders", {
+  id: text("id").primaryKey(),
+  jobNo: text("jobNo").notNull(),
+  formulaId: text("formulaId"),
+  formulaName: text("formulaName").notNull(),
+  formulaCode: text("formulaCode"),
+  customer: text("customer"),
+  batchSizeKg: doublePrecision("batchSizeKg").notNull().default(10),
+  plannedQty: integer("plannedQty"),
+  unit: text("unit").notNull().default("kg"),
+  status: text("status").notNull().default("pending"), // pending | in_progress | qc | completed | cancelled
+  priority: text("priority").notNull().default("normal"), // low | normal | high | urgent
+  plannedStart: text("plannedStart"),
+  plannedEnd: text("plannedEnd"),
+  actualStart: text("actualStart"),
+  actualEnd: text("actualEnd"),
+  assignedTo: text("assignedTo"),
+  productionNotes: text("productionNotes"),
+  materials: jsonb("materials").notNull().default([]),    // snapshot of ingredient requirements
+  batches: jsonb("batches").notNull().default([]),
+  qcResults: jsonb("qcResults").notNull().default([]),
+  costBreakdown: jsonb("costBreakdown").notNull().default({}),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
 // Single-row store (id='default') for simulation workflow metadata that is not
 // stock levels: purchase orders, job reservations, saved reservations, receive
 // records, and document counters. Stock levels live in stock_cards and the
@@ -116,6 +177,10 @@ export const simWorkflow = pgTable("sim_workflow", {
   docCounters: jsonb("docCounters").notNull().default({ SSI: 0, SRE: 0, SIN: 5, SRR: 0 }),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
 })
+
+export type FormulaRow = typeof formulas.$inferSelect
+export type FormulaIngredientRow = typeof formulaIngredients.$inferSelect
+export type JobOrderRow = typeof jobOrders.$inferSelect
 
 export type StockCardRow = typeof stockCards.$inferSelect
 export type StockLotRow = typeof stockLots.$inferSelect
