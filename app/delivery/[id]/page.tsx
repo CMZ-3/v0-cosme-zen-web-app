@@ -57,10 +57,12 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
   const [verifyMode, setVerifyMode] = useState<"picking" | "shipping" | null>(null)
 
   const order = useMemo(() => mockDeliveryOrders.find((o) => o.id === id), [id])
-  const orderLines = useMemo(
-    () => mockDeliveryLines.filter((l) => l.deliveryOrderId === id),
-    [id],
-  )
+  const orderLines = useMemo(() => {
+    const matched = mockDeliveryLines.filter((l) => l.deliveryOrderId === id)
+    // Mock data only populates lines for some orders; fall back to the shared
+    // sample lines (mirrors the Lines tab) so verification stays demonstrable.
+    return matched.length > 0 ? matched : mockDeliveryLines
+  }, [id])
 
   if (!order) {
     return (
