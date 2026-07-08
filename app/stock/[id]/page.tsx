@@ -14,6 +14,8 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { BarcodeSVG } from "@/components/barcode/barcode-svg"
+import { resolveBarcodeValue } from "@/lib/barcode-utils"
 import {
   mockStockCards, mockStockMovements, mockStockLots, mockReservations, mockLinkedProducts,
 } from "@/lib/stock-mock-data"
@@ -158,8 +160,26 @@ export default function StockDetailPage() {
                   <DetailRow label="Unit" value={card.unit} />
                   {card.supplier && <DetailRow label="Supplier" value={card.supplier} />}
                   {card.location && <DetailRow label="Location" value={card.location} icon={MapPin} />}
-                  {card.barcode && <DetailRow label="Barcode" value={card.barcode} icon={Barcode} mono />}
                   {card.storageTemp && <DetailRow label="Storage Temp" value={card.storageTemp} icon={Thermometer} />}
+                </div>
+
+                {/* Scannable Code 128 barcode */}
+                <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-border bg-white p-4">
+                  <div className="flex w-full items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
+                      <Barcode className="h-3.5 w-3.5" /> Code 128
+                      <span className={cn(
+                        "rounded-full px-1.5 py-px text-[9px] font-bold",
+                        card.barcode ? "bg-blue-50 text-blue-600" : "bg-secondary text-muted-foreground",
+                      )}>
+                        {card.barcode ? "STORED" : "AUTO"}
+                      </span>
+                    </span>
+                    <Link href="/barcode" className="text-[11px] font-semibold text-primary hover:underline">
+                      Manage / Print
+                    </Link>
+                  </div>
+                  <BarcodeSVG value={resolveBarcodeValue(card)} height={54} barWidth={1.9} fontSize={13} />
                 </div>
               </div>
 
