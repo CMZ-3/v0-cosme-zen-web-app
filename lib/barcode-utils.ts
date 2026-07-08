@@ -1,4 +1,4 @@
-import type { StockCard } from "@/lib/stock-types"
+import type { StockCard, StockLot } from "@/lib/stock-types"
 
 // ============================
 // Barcode utilities (Code 128)
@@ -54,4 +54,48 @@ export function findCardByScan<T extends Pick<StockCard, "barcode" | "itemCode">
 /** Human label for whether a barcode is stored vs auto-derived. */
 export function barcodeSource(card: Pick<StockCard, "barcode">): "stored" | "generated" {
   return card.barcode?.trim() ? "stored" : "generated"
+}
+
+// ============================
+// Lot-level barcodes
+// ============================
+// For traceability (FEFO, recalls) each physical lot gets its own scannable
+// Code 128 encoding its lot number. The lot number is already unique and
+// printable ASCII, so it is used directly.
+
+/** The value encoded into a lot-level barcode. */
+export function resolveLotBarcodeValue(lot: Pick<StockLot, "lotNumber">): string {
+  return (lot.lotNumber || "").trim().toUpperCase()
+}
+
+/** Find a lot by scanning its lot barcode / lot number. */
+export function findLotByScan<T extends Pick<StockLot, "lotNumber">>(
+  lots: T[],
+  scan: string,
+): T | undefined {
+  const needle = normalizeScan(scan)
+  if (!needle) return undefined
+  return lots.find((l) => resolveLotBarcodeValue(l) === needle)
+}
+
+/** Days until a lot expires (negative = already expired). Null if no date. */
+export function daysUntilExpiry(expireDate?: string): number | null {
+  if (!expireDate) return null
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const exp = new Date(expireDate)
+  exp.setHours(0, 0, 0, 0)
+  return Math.round((exp.getTime() - now.getTime()) / 86_400_000)
+}
+
+export type ExpiryLevel = "expired" | "critical" | "warning" | "ok"
+
+/** Bucket a lot's expiry into an alert level (critical <= 30d, warning <= 90d). */
+export function expiryLevel(expireDate?: string): ExpiryLevel {
+  const d = daysUntilExpiry(expireDate)
+  if (d === null) return "ok"
+  if (d < 0) return "expired"
+  if (d <= 30) return "critical"
+  if (d <= 90) return "warning"
+  return "ok"
 }

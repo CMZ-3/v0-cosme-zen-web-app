@@ -9,18 +9,50 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { ScanPanel } from "@/components/barcode/scan-panel"
+import { CountPanel } from "@/components/barcode/count-panel"
 import { BarcodeSVG } from "@/components/barcode/barcode-svg"
-import { LabelSheet } from "@/components/barcode/label-sheet"
-import { mockStockCards } from "@/lib/stock-mock-data"
-import { resolveBarcodeValue, barcodeSource } from "@/lib/barcode-utils"
+import { LabelSheet, type LotLabelData } from "@/components/barcode/label-sheet"
+import { mockStockCards, mockStockLots } from "@/lib/stock-mock-data"
+import {
+  resolveBarcodeValue,
+  barcodeSource,
+  resolveLotBarcodeValue,
+  expiryLevel,
+  daysUntilExpiry,
+  type ExpiryLevel,
+} from "@/lib/barcode-utils"
 import { itemTypeColors, itemTypeLabels } from "@/lib/stock-types"
-import { ScanLine, Printer, Search, Barcode as BarcodeIcon, Layers, CheckCircle2 } from "lucide-react"
+import { ScanLine, Printer, Search, Barcode as BarcodeIcon, Layers, CheckCircle2, ClipboardCheck, Boxes, Clock } from "lucide-react"
+
+const expiryBadge: Record<ExpiryLevel, string> = {
+  expired: "bg-red-100 text-red-700",
+  critical: "bg-orange-100 text-orange-700",
+  warning: "bg-amber-100 text-amber-700",
+  ok: "bg-emerald-100 text-emerald-700",
+}
 
 export default function BarcodePage() {
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [lotSelected, setLotSelected] = useState<Set<string>>(new Set())
+  const [printTarget, setPrintTarget] = useState<"cards" | "lots">("cards")
 
   const cards = mockStockCards
+
+  // Join lots with their stock card for display + labels.
+  const lotData: LotLabelData[] = useMemo(
+    () =>
+      mockStockLots.map((lot) => {
+        const card = cards.find((c) => c.id === lot.stockCardId)
+        return {
+          lot,
+          itemCode: card?.itemCode ?? "—",
+          itemName: card?.itemNameEn || card?.itemName || "Unknown item",
+          unit: card?.unit ?? "",
+        }
+      }),
+    [cards],
+  )
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -57,13 +89,34 @@ export default function BarcodePage() {
     })
   }
 
+  const selectedLots = lotData.filter((l) => lotSelected.has(l.lot.id))
+
+  function toggleLot(id: string) {
+    setLotSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   function handlePrint() {
     if (selectedCards.length === 0) {
       toast.error("Select at least one item to print labels")
       return
     }
+    setPrintTarget("cards")
     toast.success(`Printing ${selectedCards.length} label${selectedCards.length > 1 ? "s" : ""}…`)
     // Allow the print area to render before invoking the dialog.
+    setTimeout(() => window.print(), 60)
+  }
+
+  function handlePrintLots() {
+    if (selectedLots.length === 0) {
+      toast.error("Select at least one lot to print labels")
+      return
+    }
+    setPrintTarget("lots")
+    toast.success(`Printing ${selectedLots.length} lot label${selectedLots.length > 1 ? "s" : ""}…`)
     setTimeout(() => window.print(), 60)
   }
 
@@ -133,12 +186,19 @@ export default function BarcodePage() {
       <Tabs defaultValue="scan">
         <TabsList>
           <TabsTrigger value="scan" className="gap-1.5"><ScanLine className="h-4 w-4" /> Scanner</TabsTrigger>
+          <TabsTrigger value="count" className="gap-1.5"><ClipboardCheck className="h-4 w-4" /> Physical Count</TabsTrigger>
           <TabsTrigger value="registry" className="gap-1.5"><Layers className="h-4 w-4" /> Label Registry</TabsTrigger>
+          <TabsTrigger value="lots" className="gap-1.5"><Boxes className="h-4 w-4" /> Lot Labels</TabsTrigger>
         </TabsList>
 
         {/* Scanner */}
         <TabsContent value="scan" className="mt-5">
           <ScanPanel cards={cards} />
+        </TabsContent>
+
+        {/* Physical Count */}
+        <TabsContent value="count" className="mt-5">
+          <CountPanel cards={cards} />
         </TabsContent>
 
         {/* Registry */}
@@ -223,10 +283,86 @@ export default function BarcodePage() {
             </div>
           )}
         </TabsContent>
+        {/* Lot Labels */}
+        <TabsContent value="lots" className="mt-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-foreground">Lot-level traceability labels</h3>
+              <p className="text-[11px] text-muted-foreground">
+                Each lot has its own Code 128 barcode encoding the lot number, with expiry for FEFO picking.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {lotSelected.size > 0 && (
+                <span className="flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> {lotSelected.size} selected
+                </span>
+              )}
+              <Button size="sm" className="h-9 gap-1.5 text-[12px]" onClick={handlePrintLots} disabled={lotSelected.size === 0}>
+                <Printer className="h-4 w-4" /> Print lot labels
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {lotData.map(({ lot, itemCode, itemName, unit }) => {
+              const isSel = lotSelected.has(lot.id)
+              const level = expiryLevel(lot.expireDate)
+              const days = daysUntilExpiry(lot.expireDate)
+              return (
+                <div
+                  key={lot.id}
+                  className={cn(
+                    "flex flex-col rounded-2xl border bg-card p-4 shadow-sm transition-all",
+                    isSel ? "border-primary ring-1 ring-primary/30" : "border-border hover:border-primary/40",
+                    lot.status === "exhausted" && "opacity-60",
+                  )}
+                >
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <label className="flex cursor-pointer items-start gap-2">
+                      <Checkbox checked={isSel} onCheckedChange={() => toggleLot(lot.id)} className="mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="font-mono text-xs font-bold text-primary">{lot.lotNumber}</div>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <span className="font-mono">{itemCode}</span>
+                          <span className="line-clamp-1">{itemName}</span>
+                        </div>
+                      </div>
+                    </label>
+                    <span className={cn("flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold", expiryBadge[level])}>
+                      <Clock className="h-2.5 w-2.5" />
+                      {level === "expired"
+                        ? "EXPIRED"
+                        : days !== null
+                          ? `${days}d`
+                          : "—"}
+                    </span>
+                  </div>
+                  <div className="flex flex-1 items-center justify-center rounded-xl bg-white py-3">
+                    <BarcodeSVG value={resolveLotBarcodeValue(lot)} height={44} barWidth={1.6} fontSize={11} />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>Qty {lot.quantity.toLocaleString()} {unit}</span>
+                    <span>EXP {lot.expireDate ? new Date(lot.expireDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "—"}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {lotData.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
+              No lots recorded yet
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
 
       {/* Hidden print sheet */}
-      <LabelSheet cards={selectedCards} />
+      <LabelSheet
+        cards={printTarget === "cards" ? selectedCards : []}
+        lots={printTarget === "lots" ? selectedLots : []}
+      />
     </div>
   )
 }

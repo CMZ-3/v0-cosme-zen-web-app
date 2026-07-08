@@ -37,6 +37,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { DeliveryWorkflowStepper } from "@/components/delivery/delivery-workflow-stepper"
+import { PickVerifyDialog } from "@/components/delivery/pick-verify-dialog"
 import { deliveryStatusMap } from "@/lib/delivery-types"
 import type { DeliveryStatus } from "@/lib/delivery-types"
 import {
@@ -53,8 +54,13 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
   const { id } = use(params)
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("overview")
+  const [verifyMode, setVerifyMode] = useState<"picking" | "shipping" | null>(null)
 
   const order = useMemo(() => mockDeliveryOrders.find((o) => o.id === id), [id])
+  const orderLines = useMemo(
+    () => mockDeliveryLines.filter((l) => l.deliveryOrderId === id),
+    [id],
+  )
 
   if (!order) {
     return (
@@ -109,7 +115,15 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
             variant={a.variant}
             size="sm"
             className={cn("gap-1.5 rounded-[10px] text-[12px] font-semibold", a.variant === "default" && a.color && `${a.color} text-white`)}
-            onClick={() => toast.success(`${a.label}: ${order.deliveryNumber}`)}
+            onClick={() => {
+              if (a.label === "Start Picking" && orderLines.length > 0) {
+                setVerifyMode("picking")
+              } else if (a.label === "Ship" && orderLines.length > 0) {
+                setVerifyMode("shipping")
+              } else {
+                toast.success(`${a.label}: ${order.deliveryNumber}`)
+              }
+            }}
           >
             <a.icon className="h-3.5 w-3.5" />
             {a.label}
@@ -448,6 +462,21 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
           </TabsContent>
         </Tabs>
       </div>
+
+      <PickVerifyDialog
+        open={verifyMode !== null}
+        onOpenChange={(o) => !o && setVerifyMode(null)}
+        lines={orderLines}
+        mode={verifyMode ?? "picking"}
+        onConfirm={() => {
+          toast.success(
+            verifyMode === "shipping"
+              ? `Shipment verified & dispatched: ${order.deliveryNumber}`
+              : `Picking verified: ${order.deliveryNumber}`,
+          )
+          setVerifyMode(null)
+        }}
+      />
     </div>
   )
 }
