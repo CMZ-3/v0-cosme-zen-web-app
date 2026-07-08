@@ -11,14 +11,12 @@ import {
   FileText, ExternalLink, PackagePlus, ArrowLeftRight, Tags, Printer,
 } from "lucide-react"
 import { toast } from "sonner"
-import { mutate } from "swr"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BarcodeSVG } from "@/components/barcode/barcode-svg"
 import { resolveBarcodeValue } from "@/lib/barcode-utils"
 import { useStockCard } from "@/lib/hooks/use-stock"
-import { MovementDialog } from "@/components/stock/movement-dialog"
 import {
   mockStockCards, mockStockMovements, mockStockLots, mockReservations, mockLinkedProducts,
 } from "@/lib/stock-mock-data"
@@ -42,27 +40,6 @@ export default function StockDetailPage() {
 
   // Movement approval state -- spec 3.2: pending → approved, approved → reversed
   const [movementStatuses, setMovementStatuses] = useState<Record<string, string>>({})
-  const [movementDialog, setMovementDialog] = useState<"receive" | "issue" | null>(null)
-  const [releasingId, setReleasingId] = useState<string | null>(null)
-
-  async function handleRelease(reservationId: string) {
-    setReleasingId(reservationId)
-    try {
-      const res = await fetch("/api/stock/reservations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "release", reservationId }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? "Failed to release")
-      toast.success(`Reservation released · ATP now ${data.available}`)
-      mutate((key) => typeof key === "string" && key.startsWith("/api/stock"))
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to release reservation")
-    } finally {
-      setReleasingId(null)
-    }
-  }
   function getMovementStatus(mv: { id: string; status: string }) {
     return movementStatuses[mv.id] ?? mv.status
   }
@@ -122,10 +99,10 @@ export default function StockDetailPage() {
             <p className="text-sm text-muted-foreground mt-0.5">{card.itemName}</p>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => setMovementDialog("receive")}>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Receive stock for ${card.itemCode}`)}>
               <PackagePlus className="h-3 w-3" /> Receive
             </Button>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => setMovementDialog("issue")}>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Issue stock from ${card.itemCode}`)}>
               <ArrowDownToLine className="h-3 w-3" /> Issue
             </Button>
             <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.info(`Transfer ${card.itemCode}`)}>
@@ -569,17 +546,6 @@ export default function StockDetailPage() {
                           {" "}on {new Date(res.reservedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                         </div>
                       </div>
-                      {isActive && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1.5 rounded-xl text-[11px] shrink-0"
-                          onClick={() => handleRelease(res.id)}
-                          disabled={releasingId === res.id}
-                        >
-                          {releasingId === res.id ? "Releasing…" : "Release"}
-                        </Button>
-                      )}
                     </div>
                   )
                 })
@@ -588,15 +554,6 @@ export default function StockDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
-
-      {movementDialog && (
-        <MovementDialog
-          card={card}
-          mode={movementDialog}
-          open={movementDialog !== null}
-          onOpenChange={(o) => !o && setMovementDialog(null)}
-        />
-      )}
     </div>
   )
 }
