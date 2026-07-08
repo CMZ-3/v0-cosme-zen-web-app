@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
-import { Printer, Download, Pencil, FlaskConical, User, Package, DollarSign, Clock, Check, MoreHorizontal, Copy, Ban } from "lucide-react"
+import { Printer, Download, Pencil, FlaskConical, User, Package, DollarSign, Clock, Check, MoreHorizontal, Copy, Ban, PlayCircle, PauseCircle, CheckCircle2, ShieldCheck, PackageCheck, Truck } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,8 +12,76 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import type { JobOrder, TrackingStats } from "@/lib/job-order-types"
+import type { JobOrder, JOStatus, TrackingStats } from "@/lib/job-order-types"
 import { JO_STATUS_MAP } from "@/lib/job-order-types"
+
+// ─── ACTION_RULES ────────────────────────────────────────────────────────────
+// Mirrors spec 6.4: status × action → allowed
+type JOAction = "start_production" | "submit_qc" | "pass_qc" | "start_packing" | "mark_delivered" | "cancel"
+
+interface ActionDef {
+  action: JOAction
+  label: string
+  icon: React.ElementType
+  variant: "default" | "outline" | "destructive"
+  color?: string
+  allowedFrom: JOStatus[]
+  transitionsTo: JOStatus
+}
+
+const ACTION_RULES: ActionDef[] = [
+  {
+    action: "start_production",
+    label: "Start Production",
+    icon: PlayCircle,
+    variant: "default",
+    color: "bg-primary",
+    allowedFrom: ["new", "preparing_rm"],
+    transitionsTo: "in_production",
+  },
+  {
+    action: "submit_qc",
+    label: "Submit for QC",
+    icon: ShieldCheck,
+    variant: "outline",
+    allowedFrom: ["in_production"],
+    transitionsTo: "qc",
+  },
+  {
+    action: "pass_qc",
+    label: "QC Passed -- Pack",
+    icon: CheckCircle2,
+    variant: "default",
+    color: "bg-[#7c3aed]",
+    allowedFrom: ["qc"],
+    transitionsTo: "packing",
+  },
+  {
+    action: "start_packing",
+    label: "Start Packing",
+    icon: PackageCheck,
+    variant: "outline",
+    allowedFrom: ["packing"],
+    transitionsTo: "packing",
+  },
+  {
+    action: "mark_delivered",
+    label: "Mark Delivered",
+    icon: Truck,
+    variant: "default",
+    color: "bg-[#15803d]",
+    allowedFrom: ["packing"],
+    transitionsTo: "delivered",
+  },
+  {
+    action: "cancel",
+    label: "Cancel JO",
+    icon: Ban,
+    variant: "destructive",
+    allowedFrom: ["new", "preparing_rm", "in_production"],
+    transitionsTo: "cancelled",
+  },
+]
 import { OverviewTab } from "./tabs/overview-tab"
 import { DailyTrackingTab } from "./tabs/daily-tracking-tab"
 import { MaterialsTab } from "./tabs/materials-tab"
@@ -36,9 +104,22 @@ interface Props {
 
 export function JobOrderDetail({ jobOrder }: Props) {
   const [tab, setTab] = useState<DetailTab>("overview")
-  const statusInfo = JO_STATUS_MAP[jobOrder.status]
+  const [currentStatus, setCurrentStatus] = useState<JOStatus>(jobOrder.status)
+  const statusInfo = JO_STATUS_MAP[currentStatus]
 
   const stats = useMemo<TrackingStats>(() => computeStats(jobOrder), [jobOrder])
+
+  const availableActions = ACTION_RULES.filter((a) => a.allowedFrom.includes(currentStatus))
+
+  function handleAction(rule: ActionDef) {
+    if (rule.action === "cancel") {
+      if (!confirm(`Cancel JO #${jobOrder.orderNumber}? This cannot be undone.`)) return
+    }
+    setCurrentStatus(rule.transitionsTo)
+    toast.success(`JO #${jobOrder.orderNumber}: ${rule.label}`, {
+      description: `Status changed to ${JO_STATUS_MAP[rule.transitionsTo].label}`,
+    })
+  }
 
   return (
     <>
@@ -62,15 +143,32 @@ export function JobOrderDetail({ jobOrder }: Props) {
             </div>
           </div>
           <div className="flex shrink-0 items-start gap-2">
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[11px]" onClick={() => toast.success(`Printing JO #${jobOrder.orderNumber}...`)}>
-              <Printer className="h-3.5 w-3.5" /> Print
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[11px]" onClick={() => toast.success(`Exporting JO #${jobOrder.orderNumber} to PDF...`)}>
-              <Download className="h-3.5 w-3.5" /> Export
-            </Button>
-            <Button size="sm" className="h-8 gap-1.5 text-[11px]" onClick={() => toast.info(`Editing JO #${jobOrder.orderNumber}`)}>
-              <Pencil className="h-3.5 w-3.5" /> Edit
-            </Button>
+            {/* Status Badge */}
+            <span className={cn(
+              "self-center rounded-full border px-3 py-1 text-[11px] font-bold",
+              statusInfo.border, statusInfo.bg
+            )} style={{ color: statusInfo.color }}>
+              {statusInfo.label}
+            </span>
+
+            {/* Dynamic status-gated action buttons */}
+            {availableActions.filter(a => a.action !== "cancel").map((rule) => {
+              const Icon = rule.icon
+              return (
+                <Button
+                  key={rule.action}
+                  size="sm"
+                  variant={rule.variant}
+                  className={cn("h-8 gap-1.5 text-[11px]", rule.color && `${rule.color} text-white hover:opacity-90`)}
+                  onClick={() => handleAction(rule)}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {rule.label}
+                </Button>
+              )
+            })}
+
+            {/* Secondary actions dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 w-8 p-0">
@@ -78,14 +176,30 @@ export function JobOrderDetail({ jobOrder }: Props) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => toast.info(`Duplicating JO #${jobOrder.orderNumber}`)}>
-                  <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate JO
+                <DropdownMenuItem onClick={() => toast.success(`Printing JO #${jobOrder.orderNumber}...`)}>
+                  <Printer className="mr-2 h-3.5 w-3.5" /> Print JO
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {jobOrder.status !== "completed" && jobOrder.status !== "cancelled" && (
-                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => toast.error(`JO #${jobOrder.orderNumber} cancelled`)}>
-                    <Ban className="mr-2 h-3.5 w-3.5" /> Cancel JO
+                <DropdownMenuItem onClick={() => toast.success(`Exporting JO #${jobOrder.orderNumber} to PDF...`)}>
+                  <Download className="mr-2 h-3.5 w-3.5" /> Export PDF
+                </DropdownMenuItem>
+                {(currentStatus === "new" || currentStatus === "preparing_rm") && (
+                  <DropdownMenuItem onClick={() => toast.info(`Editing JO #${jobOrder.orderNumber}`)}>
+                    <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                   </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => toast.info(`Duplicating JO #${jobOrder.orderNumber}`)}>
+                  <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate
+                </DropdownMenuItem>
+                {availableActions.some(a => a.action === "cancel") && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => handleAction(ACTION_RULES.find(a => a.action === "cancel")!)}
+                    >
+                      <Ban className="mr-2 h-3.5 w-3.5" /> Cancel JO
+                    </DropdownMenuItem>
+                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>

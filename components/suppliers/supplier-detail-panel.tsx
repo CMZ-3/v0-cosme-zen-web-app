@@ -7,12 +7,13 @@ import { SUPPLIER_TYPE_MAP, CERT_STATUS_MAP } from "@/lib/supplier-types"
 import {
   MapPin, Phone, Mail, Globe, FileText, Shield, Package, ShoppingCart,
   BarChart3, FolderOpen, ChevronRight, Download, ExternalLink, Clock,
-  User, Building, Star, CheckCircle, AlertTriangle, XCircle, Plus
+  User, Building, Star, CheckCircle, AlertTriangle, XCircle, Plus,
+  ShieldCheck, ShieldAlert, BadgeCheck, CalendarDays, Award
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 
-type TabKey = "products" | "overview" | "catalog" | "coa" | "orders" | "performance" | "documents"
+type TabKey = "products" | "overview" | "catalog" | "coa" | "orders" | "performance" | "documents" | "certificates"
 
 interface SupplierDetailPanelProps {
   detail: SupplierDetail | null
@@ -65,6 +66,7 @@ function TradeCard({ paymentTerms, leadTime, moq, ytdOrder }: { paymentTerms?: s
 
 export function SupplierDetailPanel({ detail, supplierName }: SupplierDetailPanelProps) {
   const [tab, setTab] = useState<TabKey>("overview")
+  const [isApproved, setIsApproved] = useState(detail?.isApproved ?? false)
 
   if (!detail) {
     return (
@@ -85,11 +87,19 @@ export function SupplierDetailPanel({ detail, supplierName }: SupplierDetailPane
     ? ((detail.qualityRating + detail.deliveryRating + detail.priceRating) / 3).toFixed(1)
     : "--"
 
+  const expiringSoonCount = detail.certificates.filter(c => {
+    if (!c.expiryDate || c.status === "expired") return false
+    const days = Math.ceil((new Date(c.expiryDate).getTime() - Date.now()) / 86400000)
+    return days >= 0 && days <= 30
+  }).length
+  const expiredCount = detail.certificates.filter(c => c.status === "expired").length
+
   const tabs: { key: TabKey; label: string; badge?: string; badgeColor?: string }[] = [
     { key: "products", label: "Products & Packages", badge: String(detail.catalogItems.length), badgeColor: "bg-[#eef4ff] text-primary" },
     { key: "overview", label: "Overview" },
+    { key: "certificates", label: "Certificates", badge: expiredCount > 0 ? `${expiredCount} expired` : expiringSoonCount > 0 ? `${expiringSoonCount} expiring` : String(detail.certificates.length), badgeColor: expiredCount > 0 ? "bg-[#fef2f2] text-destructive" : expiringSoonCount > 0 ? "bg-[#fef3c7] text-[#c2410c]" : "bg-[#ecfdf5] text-[#15803d]" },
     { key: "catalog", label: "Catalog", badge: String(detail.catalogItems.length), badgeColor: "bg-[#eef4ff] text-[#0369a1]" },
-    { key: "coa", label: "COA Tracker", badge: detail.certificates.some(c => c.status === "expired") ? "!" : undefined, badgeColor: "bg-[#fef2f2] text-destructive" },
+    { key: "coa", label: "COA Tracker", badge: expiredCount > 0 ? "!" : undefined, badgeColor: "bg-[#fef2f2] text-destructive" },
     { key: "orders", label: "Orders" },
     { key: "performance", label: "Performance" },
     { key: "documents", label: "Documents" },
@@ -117,9 +127,15 @@ export function SupplierDetailPanel({ detail, supplierName }: SupplierDetailPane
             <div>
               <div className="flex items-center gap-2.5 mb-0.5">
                 <h1 className="text-[22px] font-extrabold tracking-tight text-foreground text-balance">{detail.supplierName}</h1>
-                <span className="rounded-full border border-[#bbf7d0] bg-[#ecfdf5] px-2 py-0.5 text-[10px] font-bold text-[#15803d]">
-                  Verified Supplier
-                </span>
+                {isApproved ? (
+                  <span className="flex items-center gap-1 rounded-full border border-[#bbf7d0] bg-[#ecfdf5] px-2 py-0.5 text-[10px] font-bold text-[#15803d]">
+                    <BadgeCheck className="h-3 w-3" /> Approved
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 rounded-full border border-[#fed7aa] bg-[#fef3c7] px-2 py-0.5 text-[10px] font-bold text-[#c2410c]">
+                    <ShieldAlert className="h-3 w-3" /> Pending Approval
+                  </span>
+                )}
               </div>
               <div className="flex flex-wrap gap-3.5 text-[12px] text-muted-foreground mb-2">
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {detail.city}, {detail.country}</span>
@@ -138,6 +154,18 @@ export function SupplierDetailPanel({ detail, supplierName }: SupplierDetailPane
           {/* Right: Actions + Scores + Trade */}
           <div className="flex gap-3.5 flex-shrink-0 items-start">
             <div className="flex flex-col gap-1.5 pt-1">
+              {!isApproved && (
+                <Button
+                  size="sm"
+                  className="h-8 rounded-lg text-[11px] gap-1.5 w-full justify-start bg-[#15803d] hover:bg-[#166534] text-white"
+                  onClick={() => {
+                    setIsApproved(true)
+                    toast.success(`${detail.supplierName} approved`, { description: "Supplier can now be used as a stock source." })
+                  }}
+                >
+                  <ShieldCheck className="h-3 w-3" /> Approve Supplier
+                </Button>
+              )}
               <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5 w-full justify-start" onClick={() => toast.info(`Editing ${detail.supplierName}`)}>
                 <Building className="h-3 w-3" /> Edit
               </Button>
@@ -184,6 +212,7 @@ export function SupplierDetailPanel({ detail, supplierName }: SupplierDetailPane
       <div className="flex-1 overflow-y-auto px-8 py-6 z-10">
         {tab === "overview" && <OverviewTab detail={detail} />}
         {tab === "products" && <ProductsTab detail={detail} />}
+        {tab === "certificates" && <CertificatesTab detail={detail} />}
         {tab === "catalog" && <CatalogTab detail={detail} />}
         {tab === "coa" && <COATrackerTab detail={detail} />}
         {tab === "orders" && <PlaceholderTab label="Orders" />}
@@ -553,6 +582,141 @@ function DocumentsTab({ detail }: { detail: SupplierDetail }) {
 }
 
 // ─── PLACEHOLDER TAB ────────────────────────
+// ─── CERTIFICATES TAB -- spec 8-3 ────────────────────────────
+function CertificatesTab({ detail }: { detail: SupplierDetail }) {
+  const today = Date.now()
+  const certs = detail.certificates.map(cert => {
+    const daysToExpiry = cert.expiryDate
+      ? Math.ceil((new Date(cert.expiryDate).getTime() - today) / 86400000)
+      : null
+    const isExpired = daysToExpiry !== null && daysToExpiry < 0
+    const expiringSoon = daysToExpiry !== null && !isExpired && daysToExpiry <= 30
+    return { ...cert, daysToExpiry, isExpired, expiringSoon }
+  })
+  const watchlist = certs.filter(c => c.isExpired || c.expiringSoon)
+  const healthy = certs.filter(c => !c.isExpired && !c.expiringSoon)
+
+  return (
+    <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300 space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-extrabold text-foreground">Certificates & Compliance</h3>
+        <Button size="sm" className="h-8 gap-1.5 text-[11px]"><Plus className="h-3 w-3" /> Add Certificate</Button>
+      </div>
+
+      {/* Expiry Watchlist */}
+      {watchlist.length > 0 && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <span className="text-sm font-bold text-destructive">Expiry Watchlist ({watchlist.length})</span>
+          </div>
+          <div className="space-y-2">
+            {watchlist.map(cert => (
+              <div key={cert.id} className={cn(
+                "flex items-center justify-between rounded-xl p-3 border",
+                cert.isExpired ? "bg-white border-red-300" : "bg-[#fffbeb] border-amber-300"
+              )}>
+                <div className="flex items-center gap-2.5">
+                  <Award className={cn("h-5 w-5", cert.isExpired ? "text-destructive" : "text-amber-600")} />
+                  <div>
+                    <div className="text-[13px] font-bold text-foreground">{cert.certificateType}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {cert.certificateNumber ? `#${cert.certificateNumber} · ` : ""}{cert.issuingBody || "—"}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {cert.expiryDate && (
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <CalendarDays className="h-3 w-3" />
+                      {new Date(cert.expiryDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                    </span>
+                  )}
+                  <span className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                    cert.isExpired ? "bg-[#fef2f2] text-destructive" : "bg-[#fef3c7] text-[#c2410c]"
+                  )}>
+                    {cert.isExpired ? "Expired" : `${cert.daysToExpiry}d left`}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All Certificates Table */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+        <div className="border-b border-border px-5 py-3 flex items-center justify-between">
+          <h4 className="text-[13px] font-bold text-foreground">All Certificates</h4>
+          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground">{certs.length} total</span>
+        </div>
+        <table className="w-full text-[12px]">
+          <thead>
+            <tr className="bg-secondary/60 text-left">
+              <th className="px-4 py-2.5 font-semibold text-muted-foreground">Certificate</th>
+              <th className="px-4 py-2.5 font-semibold text-muted-foreground">Number</th>
+              <th className="px-4 py-2.5 font-semibold text-muted-foreground">Issuing Body</th>
+              <th className="px-4 py-2.5 font-semibold text-muted-foreground text-center">Issue Date</th>
+              <th className="px-4 py-2.5 font-semibold text-muted-foreground text-center">Expiry</th>
+              <th className="px-4 py-2.5 font-semibold text-muted-foreground text-center">Days Left</th>
+              <th className="px-4 py-2.5 font-semibold text-muted-foreground text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {certs.map(cert => (
+              <tr key={cert.id} className={cn(
+                "border-t border-border transition-colors hover:bg-secondary/30",
+                cert.isExpired && "bg-red-50/50",
+                cert.expiringSoon && !cert.isExpired && "bg-amber-50/40",
+              )}>
+                <td className="px-4 py-3 font-semibold text-foreground">
+                  <div className="flex items-center gap-2">
+                    <Shield className={cn("h-3.5 w-3.5 shrink-0",
+                      cert.isExpired ? "text-destructive" : cert.expiringSoon ? "text-amber-600" : "text-[#15803d]"
+                    )} />
+                    {cert.certificateType}
+                  </div>
+                </td>
+                <td className="px-4 py-3 font-mono text-muted-foreground">{cert.certificateNumber || "—"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{cert.issuingBody || "—"}</td>
+                <td className="px-4 py-3 text-center text-muted-foreground">{cert.issueDate || "—"}</td>
+                <td className="px-4 py-3 text-center text-muted-foreground">{cert.expiryDate || "—"}</td>
+                <td className="px-4 py-3 text-center">
+                  {cert.daysToExpiry === null ? (
+                    <span className="text-muted-foreground">—</span>
+                  ) : cert.isExpired ? (
+                    <span className="font-bold text-destructive">{Math.abs(cert.daysToExpiry)}d ago</span>
+                  ) : (
+                    <span className={cn("font-bold", cert.expiringSoon ? "text-amber-600" : "text-[#15803d]")}>
+                      {cert.daysToExpiry}d
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className={cn(
+                    "rounded-full px-2.5 py-0.5 text-[10px] font-bold border",
+                    CERT_STATUS_MAP[cert.status].bg,
+                    CERT_STATUS_MAP[cert.status].color,
+                    CERT_STATUS_MAP[cert.status].border,
+                  )}>
+                    {CERT_STATUS_MAP[cert.status].label}
+                    {cert.expiringSoon && !cert.isExpired && " (Soon)"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {certs.length === 0 && (
+              <tr><td colSpan={7} className="py-10 text-center text-muted-foreground">No certificates on record</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function PlaceholderTab({ label }: { label: string }) {
   return (
     <div className="flex items-center justify-center h-40 text-[13px] text-muted-foreground animate-in fade-in-0 duration-300">
