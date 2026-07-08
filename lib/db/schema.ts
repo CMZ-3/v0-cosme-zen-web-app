@@ -73,8 +73,10 @@ export const stockMovements = pgTable("stock_movements", {
   userId: text("userId"),
   referenceNumber: text("referenceNumber").notNull(),
   movementType: text("movementType").notNull(),
-  stockCardId: text("stockCardId").notNull(),
-  itemCode: text("itemCode").notNull(),
+  // Nullable so the ledger can hold workflow-level entries (e.g. formula-level
+  // reservations) that are not tied to a single stock card.
+  stockCardId: text("stockCardId"),
+  itemCode: text("itemCode"),
   itemName: text("itemName").notNull(),
   quantity: doublePrecision("quantity").notNull(),
   unitCost: doublePrecision("unitCost"),
