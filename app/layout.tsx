@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Plus_Jakarta_Sans, Space_Mono } from 'next/font/google'
+import { Plus_Jakarta_Sans, Space_Mono, Noto_Sans_Thai } from 'next/font/google'
 import { Toaster } from 'sonner'
 import { AppShell } from '@/components/app-shell'
 import './globals.css'
@@ -16,6 +16,13 @@ const _spaceMono = Space_Mono({
   weight: ['400', '700'],
 })
 
+// Thai-capable font: provides Thai script + the ฿ (Baht) glyph missing from Plus Jakarta Sans
+const _notoSansThai = Noto_Sans_Thai({
+  subsets: ['thai', 'latin'],
+  variable: '--font-thai',
+  weight: ['300', '400', '500', '600', '700'],
+})
+
 export const metadata: Metadata = {
   title: 'CosmeZen - OEM Cosmetics Factory',
   description: 'CosmeZen Cosmetics OEM/ODM Management System - Production & Job Orders',
@@ -27,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="th">
+    <html lang="th" className={_notoSansThai.variable}>
       <body className="font-sans antialiased">
         <AppShell>
           {children}
