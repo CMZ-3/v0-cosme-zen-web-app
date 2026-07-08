@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { stockCards, stockLots, stockMovements, stockReservations, simWorkflow, formulas, formulaIngredients, jobOrders } from "@/lib/db/schema"
+import { stockCards, stockLots, stockMovements, stockReservations, simWorkflow, formulas, formulaIngredients, jobOrders, deliveryOrders } from "@/lib/db/schema"
 import { INIT_STOCK, INIT_POS, INIT_JOBS, INIT_MOVEMENTS } from "@/lib/stock-simulation-store"
 import { stockItemToCardValues } from "@/lib/db/sim-mapping"
 import { NEW_STOCK_CARDS, FORMULA_ROWS, INGREDIENT_ROWS, JOB_ORDER_ROWS } from "@/lib/db/formula-seed-data"
+import { mockDeliveryOrders } from "@/lib/delivery-mock-data"
 import type { StockItem } from "@/lib/stock-types"
 
 // Reset + seed the unified stock catalog. This REPLACES all stock rows with the
@@ -69,8 +70,9 @@ export async function POST(req: Request) {
       })
     })
 
-    // Seed formula module if requested (or on full reset).
+    // Seed formula + delivery modules on full reset.
     await seedFormulas()
+    await seedDelivery()
 
     return NextResponse.json({
       ok: true,
@@ -81,6 +83,7 @@ export async function POST(req: Request) {
         formulas: FORMULA_ROWS.length,
         formulaIngredients: INGREDIENT_ROWS.length,
         jobOrders: JOB_ORDER_ROWS.length,
+        deliveryOrders: mockDeliveryOrders.length,
       },
     })
   } catch (err) {
@@ -89,22 +92,70 @@ export async function POST(req: Request) {
   }
 }
 
-// GET ?part=formulas — re-seed only formulas/ingredients/job_orders + new stock cards.
+// GET ?part=formulas  — re-seed formulas/ingredients/job_orders
+// GET ?part=delivery  — re-seed delivery orders from mock
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
-    if (url.searchParams.get("part") !== "formulas") {
-      return NextResponse.json({ ok: false, error: "Use ?part=formulas" }, { status: 400 })
+    const part = url.searchParams.get("part")
+    if (part === "formulas") {
+      await seedFormulas()
+      return NextResponse.json({
+        ok: true,
+        seeded: { formulas: FORMULA_ROWS.length, formulaIngredients: INGREDIENT_ROWS.length, jobOrders: JOB_ORDER_ROWS.length },
+      })
     }
-    await seedFormulas()
-    return NextResponse.json({
-      ok: true,
-      seeded: { formulas: FORMULA_ROWS.length, formulaIngredients: INGREDIENT_ROWS.length, jobOrders: JOB_ORDER_ROWS.length },
-    })
+    if (part === "delivery") {
+      await seedDelivery()
+      return NextResponse.json({ ok: true, seeded: { deliveryOrders: mockDeliveryOrders.length } })
+    }
+    return NextResponse.json({ ok: false, error: "Use ?part=formulas or ?part=delivery" }, { status: 400 })
   } catch (err) {
-    console.error("[v0] formula seed error:", err)
+    console.error("[v0] seed GET error:", err)
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
   }
+}
+
+async function seedDelivery() {
+  await db.delete(deliveryOrders)
+  const rows = mockDeliveryOrders.map((o) => ({
+    id: o.id,
+    deliveryNumber: o.deliveryNumber,
+    jobOrderId: null,
+    customerId: o.customerId ?? null,
+    customerName: o.customerName,
+    customerBrand: o.customerBrand ?? null,
+    salesOrderRef: o.salesOrderRef ?? null,
+    orderDate: o.orderDate,
+    deliveryDate: o.deliveryDate ?? null,
+    actualDeliveryDate: o.actualDeliveryDate ?? null,
+    deliveryAddress: o.deliveryAddress ?? null,
+    deliveryCity: o.deliveryCity ?? null,
+    deliveryProvince: o.deliveryProvince ?? null,
+    deliveryPostalCode: o.deliveryPostalCode ?? null,
+    contactName: o.contactName ?? null,
+    contactPhone: o.contactPhone ?? null,
+    status: o.status,
+    totalQuantity: o.totalQuantity ?? null,
+    totalAmount: o.totalAmount ?? null,
+    shippingMethod: o.shippingMethod ?? null,
+    trackingNumber: o.trackingNumber ?? null,
+    shippingCost: null,
+    weightKg: o.weightKg ?? null,
+    boxesCount: o.boxesCount ?? null,
+    productSummary: o.productSummary ?? null,
+    jobStatus: o.jobStatus ?? null,
+    pickedBy: null,
+    pickedAt: null,
+    shippedBy: null,
+    shippedAt: null,
+    receiverName: null,
+    podNotes: null,
+    podSignedAt: null,
+    notes: null,
+    createdBy: "seed",
+  }))
+  await db.insert(deliveryOrders).values(rows)
 }
 
 async function seedFormulas() {

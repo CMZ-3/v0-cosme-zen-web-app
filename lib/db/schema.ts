@@ -163,6 +163,52 @@ export const jobOrders = pgTable("job_orders", {
   updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
 })
 
+// ============================================================
+// Delivery Module table
+// ============================================================
+
+export const deliveryOrders = pgTable("delivery_orders", {
+  id: text("id").primaryKey(),
+  deliveryNumber: text("deliveryNumber").notNull(),
+  jobOrderId: text("jobOrderId"),
+  customerId: text("customerId"),
+  customerName: text("customerName").notNull(),
+  customerBrand: text("customerBrand"),
+  salesOrderRef: text("salesOrderRef"),
+  orderDate: text("orderDate").notNull(),
+  deliveryDate: text("deliveryDate"),
+  actualDeliveryDate: text("actualDeliveryDate"),
+  deliveryAddress: text("deliveryAddress"),
+  deliveryCity: text("deliveryCity"),
+  deliveryProvince: text("deliveryProvince"),
+  deliveryPostalCode: text("deliveryPostalCode"),
+  contactName: text("contactName"),
+  contactPhone: text("contactPhone"),
+  status: text("status").notNull().default("draft"),
+  totalQuantity: integer("totalQuantity"),
+  totalAmount: doublePrecision("totalAmount"),
+  shippingMethod: text("shippingMethod"),
+  trackingNumber: text("trackingNumber"),
+  shippingCost: doublePrecision("shippingCost"),
+  weightKg: doublePrecision("weightKg"),
+  boxesCount: integer("boxesCount"),
+  productSummary: text("productSummary"),
+  jobStatus: text("jobStatus"),
+  pickedBy: text("pickedBy"),
+  pickedAt: text("pickedAt"),
+  shippedBy: text("shippedBy"),
+  shippedAt: text("shippedAt"),
+  receiverName: text("receiverName"),
+  podNotes: text("podNotes"),
+  podSignedAt: text("podSignedAt"),
+  notes: text("notes"),
+  createdBy: text("createdBy"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type DeliveryOrderRow = typeof deliveryOrders.$inferSelect
+
 // Single-row store (id='default') for simulation workflow metadata that is not
 // stock levels: purchase orders, job reservations, saved reservations, receive
 // records, and document counters. Stock levels live in stock_cards and the

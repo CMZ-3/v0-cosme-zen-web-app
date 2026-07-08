@@ -38,11 +38,20 @@ const statusFilters: { value: DeliveryStatus | "all" | "pending_close"; label: s
 interface DeliveryTableProps {
   data: DeliveryOrder[]
   onRowClick?: (id: string) => void
+  onStatusChange?: () => void
 }
 
 const DELIVERY_PAGE_SIZE = 15
 
-export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
+async function patchStatus(id: string, status: string) {
+  await fetch(`/api/delivery-orders/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  })
+}
+
+export function DeliveryTable({ data, onRowClick, onStatusChange }: DeliveryTableProps) {
   const { toast } = useToast()
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
@@ -317,7 +326,11 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
                               </DropdownMenuItem>
                             )}
                             {row.jobStatus === "pending_close" && (
-                              <DropdownMenuItem onClick={() => toast({ title: "Job Closed", description: `Closed job for ${row.deliveryNumber}` })}>
+                              <DropdownMenuItem onClick={async () => {
+                                await patchStatus(row.id, "completed")
+                                toast({ title: "Job Closed", description: `${row.deliveryNumber} marked as completed` })
+                                onStatusChange?.()
+                              }}>
                                 <Flag className="mr-2 h-3.5 w-3.5" /> Close Job
                               </DropdownMenuItem>
                             )}

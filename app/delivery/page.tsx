@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import useSWR from "swr"
 import {
   PackageCheck,
   Plus,
@@ -11,13 +12,16 @@ import {
   CalendarDays,
   Clock,
   TrendingUp,
+  RefreshCw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DeliveryKpiCards } from "@/components/delivery/delivery-kpi-cards"
 import { DeliveryTable } from "@/components/delivery/delivery-table"
 import { CreateDeliveryDialog } from "@/components/delivery/create-delivery-dialog"
-import { mockDeliveryKPI, mockDeliveryOrders } from "@/lib/delivery-mock-data"
+import type { DeliveryKPISummary } from "@/lib/delivery-types"
 import { cn } from "@/lib/utils"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type PageTab = "list" | "board" | "calendar" | "pending" | "analytics"
 
@@ -29,11 +33,17 @@ const pageTabs: { value: PageTab; label: string; icon: typeof FileText; count?: 
   { value: "analytics", label: "Analytics", icon: TrendingUp },
 ]
 
+const EMPTY_KPI: DeliveryKPISummary = { total: 0, preparing: 0, picking: 0, shipped: 0, delivered: 0, completed: 0, pendingClose: 0 }
+
 export default function DeliveryPage() {
   const router = useRouter()
   const [createOpen, setCreateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<PageTab>("list")
   const [kpiFilter, setKpiFilter] = useState<string>("total")
+
+  const { data, mutate, isLoading } = useSWR("/api/delivery-orders", fetcher, { refreshInterval: 30000 })
+  const orders = data?.orders ?? []
+  const kpi: DeliveryKPISummary = data?.kpi ?? EMPTY_KPI
 
   return (
     <div className="flex flex-col gap-0 overflow-y-auto h-screen">
@@ -52,18 +62,24 @@ export default function DeliveryPage() {
             </div>
           </div>
           <div className="flex items-center gap-2.5">
-            <Button variant="outline" size="sm" className="gap-1.5 rounded-[10px] text-[12px] font-semibold border-border">
-              <Download className="h-3.5 w-3.5" />
-              Export
-            </Button>
-            <Button
-              size="sm"
-              className="gap-1.5 rounded-[10px] bg-teal-500 hover:bg-teal-600 text-white text-[12px] font-bold shadow-[0_2px_8px_rgba(20,184,166,0.25)]"
-              onClick={() => setCreateOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              {"Create DO"}
-            </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 rounded-[10px] text-[12px] font-semibold border-border"
+            onClick={() => mutate()}
+            disabled={isLoading}
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+            Refresh
+          </Button>
+          <Button
+            size="sm"
+            className="gap-1.5 rounded-[10px] bg-teal-500 hover:bg-teal-600 text-white text-[12px] font-bold shadow-[0_2px_8px_rgba(20,184,166,0.25)]"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            {"Create DO"}
+          </Button>
           </div>
         </div>
 
@@ -104,8 +120,12 @@ export default function DeliveryPage() {
       {/* Tab Content */}
       {activeTab === "list" && (
         <div className="flex flex-col gap-3 px-8 pt-4 pb-8">
-          <DeliveryKpiCards kpi={mockDeliveryKPI} activeFilter={kpiFilter} onFilterClick={setKpiFilter} />
-          <DeliveryTable data={mockDeliveryOrders} onRowClick={(id) => router.push(`/delivery/${id}`)} />
+          <DeliveryKpiCards kpi={kpi} activeFilter={kpiFilter} onFilterClick={setKpiFilter} />
+          <DeliveryTable
+            data={orders}
+            onRowClick={(id) => router.push(`/delivery/${id}`)}
+            onStatusChange={() => mutate()}
+          />
         </div>
       )}
 
@@ -141,7 +161,7 @@ export default function DeliveryPage() {
         </div>
       )}
 
-      <CreateDeliveryDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateDeliveryDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => mutate()} />
     </div>
   )
 }
