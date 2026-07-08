@@ -21,9 +21,10 @@ interface JobOrderListPanelProps {
   jobOrders: JobOrder[]
   selectedId: string
   onSelect: (id: string) => void
+  onCreated?: () => void
 }
 
-export function JobOrderListPanel({ jobOrders, selectedId, onSelect }: JobOrderListPanelProps) {
+export function JobOrderListPanel({ jobOrders, selectedId, onSelect, onCreated }: JobOrderListPanelProps) {
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("all")
   const [showCreate, setShowCreate] = useState(false)
@@ -47,7 +48,7 @@ export function JobOrderListPanel({ jobOrders, selectedId, onSelect }: JobOrderL
 
   return (
     <div className="flex w-[340px] min-w-[340px] flex-col border-r border-border bg-secondary/50 h-screen">
-      <CreateJobOrderDialog open={showCreate} onOpenChange={setShowCreate} />
+      <CreateJobOrderDialog open={showCreate} onOpenChange={setShowCreate} onCreated={onCreated} />
       {/* Header */}
       <div className="border-b border-border bg-card/60 px-5 py-5 backdrop-blur-sm">
         <div className="mb-3 flex items-center justify-between">

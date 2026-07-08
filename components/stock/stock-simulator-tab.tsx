@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import useSWR from "swr"
 import { FlaskConical, Plus, Trash2, Lock, Link2, X, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,9 +23,22 @@ import {
   getStockItem,
   FORMULA_COLORS,
 } from "@/lib/stock-simulation-store"
+import type { Formula, FormulaIngredient } from "@/lib/stock-types"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 export function StockSimulatorTab() {
   const { state, addToMemory, removeFromMemory, clearMemory, confirmSplitReservation, linkReservation } = useStockSimulation()
+
+  // Merge hardcoded FORMULAS (using real stock card ids) with live DB formulas.
+  const { data: dbFormulasData } = useSWR("/api/formulas/simulator", fetcher, {
+    revalidateOnFocus: false,
+  })
+  const allFormulas = useMemo<Record<string, Formula & { label?: string }>>(
+    () => ({ ...FORMULAS, ...(dbFormulasData?.formulas ?? {}) }),
+    [dbFormulasData],
+  )
+
   const [selectedFormula, setSelectedFormula] = useState("f1")
   const [batchSize, setBatchSize] = useState("50")
   const [weightPerUnit, setWeightPerUnit] = useState("")
@@ -38,7 +52,12 @@ export function StockSimulatorTab() {
   const [targetJo, setTargetJo] = useState("")
 
   const bs = parseFloat(batchSize) || 0
-  const formula = FORMULAS[selectedFormula]
+  // If the currently selected formula key no longer exists (e.g. after DB
+  // formulas load and "f1" is gone), fall back to the first available key.
+  const resolvedFormulaKey = allFormulas[selectedFormula]
+    ? selectedFormula
+    : Object.keys(allFormulas)[0] ?? ""
+  const formula = allFormulas[resolvedFormulaKey]
 
   const manualPieces = (parseFloat(weightPerUnit) || 0) > 0 && (parseInt(unitCount) || 0) > 0
     ? Math.round((parseFloat(weightPerUnit) * parseInt(unitCount)) / 1000 * 100) / 100
@@ -48,9 +67,12 @@ export function StockSimulatorTab() {
 
   const pieces = useMemo(() => {
     const mp = parseInt(unitCount) || 0
-    const derived = getPiecesFromBatch(selectedFormula, bs)
-    return mp > 0 ? mp : derived
-  }, [unitCount, selectedFormula, bs])
+    if (formula && bs > 0 && formula.unitWeight > 0) {
+      // Derived from batch kg: (batchKg * 1000) / unitWeightG
+      return Math.floor((bs * 1000) / formula.unitWeight)
+    }
+    return mp > 0 ? mp : 0
+  }, [unitCount, formula, bs])
 
   const preview = useMemo(() => {
     if (!formula) return []
@@ -130,7 +152,9 @@ export function StockSimulatorTab() {
 
   function handleAddToMemory() {
     const mp = parseInt(unitCount) || 0
-    addToMemory(selectedFormula, bs, mp > 0 ? mp : undefined)
+    // Pass formula directly so DB formulas (not in hardcoded FORMULAS map) work.
+    const override = formula ? { ...formula } : undefined
+    addToMemory(resolvedFormulaKey, bs, mp > 0 ? mp : undefined, override)
   }
 
   function handleConfirmReserve() {
@@ -175,8 +199,10 @@ export function StockSimulatorTab() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(FORMULAS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v.name}</SelectItem>
+                  {Object.entries(allFormulas).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v.label ?? v.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

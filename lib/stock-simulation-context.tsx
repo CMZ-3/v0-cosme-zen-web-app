@@ -35,7 +35,7 @@ interface StockSimContextValue {
   isLoading: boolean
   resetAll: () => void
   // Simulator (client-side scratchpad – memoryBank never needs to persist)
-  addToMemory: (formulaId: string, batchSize: number, manualPieces?: number) => void
+  addToMemory: (formulaId: string, batchSize: number, manualPieces?: number, formulaOverride?: import("./stock-types").Formula & { name: string }) => void
   removeFromMemory: (id: number) => void
   clearMemory: () => void
   confirmSplitReservation: (prefix: string) => void
@@ -158,8 +158,13 @@ export function StockSimulationProvider({ children }: { children: ReactNode }) {
   // Memory bank (client-side scratchpad)
   // -------------------------------------------------------------------------
 
-  const addToMemory = useCallback((formulaId: string, batchSize: number, manualPieces?: number) => {
-    const f = FORMULAS[formulaId]
+  const addToMemory = useCallback((
+    formulaId: string,
+    batchSize: number,
+    manualPieces?: number,
+    formulaOverride?: import("./stock-types").Formula & { name: string },
+  ) => {
+    const f = formulaOverride ?? FORMULAS[formulaId]
     if (!f || batchSize <= 0) return
     const derivedPieces = getPiecesFromBatch(formulaId, batchSize)
     const pieces = manualPieces && manualPieces > 0 ? manualPieces : derivedPieces

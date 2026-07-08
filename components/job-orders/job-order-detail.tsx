@@ -100,9 +100,10 @@ const TABS: { value: DetailTab; label: string; icon: React.ReactNode }[] = [
 
 interface Props {
   jobOrder: JobOrder
+  onStatusChange?: () => void
 }
 
-export function JobOrderDetail({ jobOrder }: Props) {
+export function JobOrderDetail({ jobOrder, onStatusChange }: Props) {
   const [tab, setTab] = useState<DetailTab>("overview")
   const [currentStatus, setCurrentStatus] = useState<JOStatus>(jobOrder.status)
   const statusInfo = JO_STATUS_MAP[currentStatus]
@@ -111,13 +112,24 @@ export function JobOrderDetail({ jobOrder }: Props) {
 
   const availableActions = ACTION_RULES.filter((a) => a.allowedFrom.includes(currentStatus))
 
-  function handleAction(rule: ActionDef) {
+  async function handleAction(rule: ActionDef) {
     if (rule.action === "cancel") {
       if (!confirm(`Cancel JO #${jobOrder.orderNumber}? This cannot be undone.`)) return
     }
-    setCurrentStatus(rule.transitionsTo)
+    const newStatus = rule.transitionsTo
+    setCurrentStatus(newStatus)
+    try {
+      await fetch(`/api/job-orders/${jobOrder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      onStatusChange?.()
+    } catch {
+      // status already updated optimistically in UI; silently ignore network errors
+    }
     toast.success(`JO #${jobOrder.orderNumber}: ${rule.label}`, {
-      description: `Status changed to ${JO_STATUS_MAP[rule.transitionsTo].label}`,
+      description: `Status changed to ${JO_STATUS_MAP[newStatus].label}`,
     })
   }
 

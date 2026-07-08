@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react"
 import { ClipboardCheck, Plus, Trash2, Play, RotateCcw, PackageCheck, AlertTriangle, TriangleAlert } from "lucide-react"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { mockStockCards } from "@/lib/stock-mock-data"
 import { mockFormulaList, mockFormulaIngredients } from "@/lib/formula-mock-data"
+import type { Formula } from "@/lib/formula-types"
 import {
   runStockCheck,
   checkStatusLabel,
@@ -16,20 +18,27 @@ import {
   type CheckSession,
 } from "@/lib/stock-check-utils"
 
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
 let jobSeq = 1
-function newJob(): CheckJobInput {
-  return { id: `job-${jobSeq++}`, formulaId: mockFormulaList[0]?.id ?? "", batchQty: 1 }
+function newJob(defaultId = ""): CheckJobInput {
+  return { id: `job-${jobSeq++}`, formulaId: defaultId, batchQty: 1 }
 }
 
 export function StockCheckPage() {
   const [jobs, setJobs] = useState<CheckJobInput[]>([newJob()])
   const [session, setSession] = useState<CheckSession | null>(null)
 
-  const activeFormulas = useMemo(
-    () => mockFormulaList.filter((f) => f.status === "active" || f.status === "approved"),
-    [],
+  // Load DB formulas for the dropdown.
+  const { data: formulasData } = useSWR("/api/formulas", fetcher, { revalidateOnFocus: false })
+  const dbFormulas: Formula[] = useMemo(() => formulasData?.formulas ?? [], [formulasData])
+
+  // Merge DB formulas with mock list as fallback.
+  const allFormulas = useMemo(
+    () => (dbFormulas.length > 0 ? dbFormulas : mockFormulaList),
+    [dbFormulas],
   )
-  const formulaOptions = activeFormulas.length > 0 ? activeFormulas : mockFormulaList
+  const formulaOptions = allFormulas
 
   function addJob() {
     setJobs((j) => [...j, newJob()])
@@ -47,7 +56,7 @@ export function StockCheckPage() {
       toast.error("Add at least one job with a formula and batch quantity")
       return
     }
-    const result = runStockCheck(valid, mockFormulaList, mockFormulaIngredients, mockStockCards)
+    const result = runStockCheck(valid, allFormulas, mockFormulaIngredients, mockStockCards)
     setSession(result)
     if (result.totalItems === 0) {
       toast.warning("No tracked raw materials matched these formulas")
@@ -113,7 +122,7 @@ export function StockCheckPage() {
                 <span />
               </div>
               {jobs.map((job) => {
-                const formula = mockFormulaList.find((f) => f.id === job.formulaId)
+                const formula = allFormulas.find((f) => f.id === job.formulaId)
                 return (
                   <div key={job.id} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px_40px] sm:items-center">
                     <select
