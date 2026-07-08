@@ -5,6 +5,7 @@ import {
   doublePrecision,
   timestamp,
   boolean,
+  jsonb,
 } from "drizzle-orm/pg-core"
 
 // ============================================================
@@ -41,6 +42,7 @@ export const stockCards = pgTable("stock_cards", {
   casNo: text("casNo"),
   storageTemp: text("storageTemp"),
   expiryDate: text("expiryDate"),
+  defaultLot: text("defaultLot"), // default lot label used by the simulation StockItem view
   status: text("status").notNull().default("active"), // active | inactive | discontinued
   inventoryStatus: text("inventoryStatus").notNull().default("healthy"),
   createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
@@ -98,7 +100,23 @@ export const stockReservations = pgTable("stock_reservations", {
   releasedAt: timestamp("releasedAt", { withTimezone: true }),
 })
 
+// Single-row store (id='default') for simulation workflow metadata that is not
+// stock levels: purchase orders, job reservations, saved reservations, receive
+// records, and document counters. Stock levels live in stock_cards and the
+// canonical ledger lives in stock_movements.
+export const simWorkflow = pgTable("sim_workflow", {
+  id: text("id").primaryKey().default("default"),
+  userId: text("userId"),
+  purchaseOrders: jsonb("purchaseOrders").notNull().default([]),
+  jobReservations: jsonb("jobReservations").notNull().default([]),
+  savedReservations: jsonb("savedReservations").notNull().default([]),
+  receiveRecords: jsonb("receiveRecords").notNull().default([]),
+  docCounters: jsonb("docCounters").notNull().default({ SSI: 0, SRE: 0, SIN: 5, SRR: 0 }),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
 export type StockCardRow = typeof stockCards.$inferSelect
 export type StockLotRow = typeof stockLots.$inferSelect
 export type StockMovementRow = typeof stockMovements.$inferSelect
 export type StockReservationRow = typeof stockReservations.$inferSelect
+export type SimWorkflowRow = typeof simWorkflow.$inferSelect

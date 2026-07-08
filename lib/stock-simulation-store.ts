@@ -16,7 +16,7 @@ import type {
 // INITIAL DATA
 // ════════════════════════════════════════════════════
 
-const INIT_STOCK = (): StockItem[] => [
+export const INIT_STOCK = (): StockItem[] => [
   { id: "RM001", name: "Shea Butter", code: "RM-001", category: "Emollient", balance: 100, reserved: 0, incoming: 50, unit: "kg", min: 50, max: 200, cost: 180, lot: "LOT-2026-A1", supplier: "Organic Supply Co.", temp: "25C", expiry: "2027-06-15" },
   { id: "RM002", name: "Glycerin 99.5%", code: "RM-005", category: "Humectant", balance: 200, reserved: 0, incoming: 0, unit: "kg", min: 100, max: 500, cost: 85, lot: "LOT-2026-B3", supplier: "Chem Supply Co.", temp: "Room", expiry: "2028-01-20" },
   { id: "RM003", name: "Vitamin C Powder (LAA)", code: "RM-009", category: "Active Ingredient", balance: 5, reserved: 0, incoming: 3, unit: "kg", min: 10, max: 50, cost: 2800, lot: "LOT-2026-C2", supplier: "DSM Nutritional", temp: "15C", expiry: "2026-12-01" },
@@ -92,7 +92,7 @@ export const FORMULAS: Record<string, Formula> = {
   },
 }
 
-const INIT_POS = (): PurchaseOrder[] => [
+export const INIT_POS = (): PurchaseOrder[] => [
   { poNo: "SIN-260225-001", supplier: "Organic Supply Co.", items: [{ itemId: "RM001", name: "Shea Butter", qty: 50, receivedQty: 0 }], status: "PENDING", eta: "2026-03-01" },
   { poNo: "SIN-260225-002", supplier: "Chem Supply Co.", items: [{ itemId: "RM003", name: "Vitamin C Powder", qty: 3, receivedQty: 0 }, { itemId: "PKG02", name: "Pump Head Black", qty: 500, receivedQty: 0 }], status: "PENDING", eta: "2026-03-03" },
   { poNo: "SIN-260225-003", supplier: "Lonza (TH)", items: [{ itemId: "RM006", name: "Niacinamide Powder", qty: 5, receivedQty: 0 }], status: "PENDING", eta: "2026-03-05" },
@@ -100,14 +100,14 @@ const INIT_POS = (): PurchaseOrder[] => [
   { poNo: "SIN-260225-005", supplier: "Thai Packaging", items: [{ itemId: "PKG04", name: "Tube 120ml White", qty: 300, receivedQty: 0 }], status: "PENDING", eta: "2026-02-28" },
 ]
 
-const INIT_JOBS = (): JobReservation[] => [
+export const INIT_JOBS = (): JobReservation[] => [
   { jobNo: "JO-2026-001", itemCode: "RM001", itemName: "Shea Butter", qtyNeeded: 30, qtyAllocated: 0, status: "WAITING" },
   { jobNo: "JO-2026-001", itemCode: "RM002", itemName: "Glycerin 99.5%", qtyNeeded: 15, qtyAllocated: 15, status: "READY" },
   { jobNo: "JO-2026-002", itemCode: "RM003", itemName: "Vitamin C Powder", qtyNeeded: 2, qtyAllocated: 2, status: "READY" },
   { jobNo: "JO-2026-002", itemCode: "RM002", itemName: "Glycerin 99.5%", qtyNeeded: 10, qtyAllocated: 10, status: "READY" },
 ]
 
-const INIT_MOVEMENTS = (): MovementLogEntry[] => [
+export const INIT_MOVEMENTS = (): MovementLogEntry[] => [
   { ts: "2026-02-25 08:30", item: "Glycerin 99.5%", type: "IN", qty: 200, ref: "SIN-260225-001", note: "Full PO received" },
   { ts: "2026-02-24 14:15", item: "Vitamin C Powder", type: "OUT", qty: -3, ref: "JO-2026-002", note: "Issued to production" },
   { ts: "2026-02-24 09:00", item: "Bottle 100ml Clear", type: "IN", qty: 500, ref: "SIN-260224-001", note: "Partial PO received" },

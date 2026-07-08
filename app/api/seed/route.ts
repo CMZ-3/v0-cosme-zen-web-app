@@ -1,103 +1,76 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { stockCards, stockLots, stockMovements, stockReservations } from "@/lib/db/schema"
-import {
-  mockStockCards,
-  mockStockMovements,
-  mockStockLots,
-  mockReservations,
-} from "@/lib/stock-mock-data"
+import { stockCards, stockLots, stockMovements, stockReservations, simWorkflow } from "@/lib/db/schema"
+import { INIT_STOCK, INIT_POS, INIT_JOBS, INIT_MOVEMENTS } from "@/lib/stock-simulation-store"
+import { stockItemToCardValues } from "@/lib/db/sim-mapping"
+import type { StockItem } from "@/lib/stock-types"
 
-// One-time seed of the Stock module tables from the existing mock data.
-// Safe to re-run: rows conflict on primary key and are skipped.
-export async function POST() {
+// Reset + seed the unified stock catalog. This REPLACES all stock rows with the
+// 12-item simulation catalog so the whole module shares one source of truth.
+// Destructive by design (it is the "Reset demo data" action); requires ?reset=1.
+export async function POST(req: Request) {
   try {
-    const cardRows = mockStockCards.map((c) => ({
-      id: c.id,
-      itemCode: c.itemCode,
-      itemName: c.itemName,
-      itemNameEn: c.itemNameEn ?? null,
-      itemType: c.itemType,
-      category: c.category,
-      unit: c.unit,
-      balance: c.balance,
-      reservedStock: c.reservedStock,
-      incomingStock: c.incomingStock,
-      available: c.available,
-      initialStock: c.initialStock,
-      minStock: c.minStock,
-      maxStock: c.maxStock,
-      reorderPoint: c.reorderPoint,
-      unitCost: c.unitCost ?? null,
-      supplier: c.supplier ?? null,
-      location: c.location ?? null,
-      barcode: c.barcode ?? null,
-      tradeName: c.tradeName ?? null,
-      inciName: c.inciName ?? null,
-      casNo: c.casNo ?? null,
-      storageTemp: c.storageTemp ?? null,
-      expiryDate: c.expiryDate ?? null,
-      status: c.status,
-      inventoryStatus: c.inventoryStatus,
-    }))
+    const url = new URL(req.url)
+    if (url.searchParams.get("reset") !== "1") {
+      return NextResponse.json(
+        { ok: false, error: "Pass ?reset=1 to confirm a destructive reseed." },
+        { status: 400 },
+      )
+    }
 
-    const lotRows = mockStockLots.map((l) => ({
-      id: l.id,
-      stockCardId: l.stockCardId,
-      lotNumber: l.lotNumber,
-      quantity: l.quantity,
-      reservedQty: l.reservedQty,
-      expireDate: l.expireDate ?? null,
-      manufacturedDate: l.manufacturedDate ?? null,
-      supplierLotNo: l.supplierLotNo ?? null,
-      unitCost: l.unitCost ?? null,
-      sourceType: l.sourceType,
-      status: l.status,
-      lotCategory: l.lotCategory,
-      parentLotId: l.parentLotId ?? null,
-      notes: l.notes ?? null,
-    }))
+    const catalog = INIT_STOCK()
+    const byName = new Map<string, StockItem>()
+    catalog.forEach((c) => byName.set(c.name, c))
+    // Best-effort resolver: exact name, then partial include match.
+    const resolve = (name: string): StockItem | undefined => {
+      if (byName.has(name)) return byName.get(name)
+      return catalog.find((c) => c.name.includes(name) || name.includes(c.name))
+    }
 
-    const movementRows = mockStockMovements.map((m) => ({
-      id: m.id,
-      referenceNumber: m.referenceNumber,
-      movementType: m.movementType,
-      stockCardId: m.stockCardId,
-      itemCode: m.itemCode,
-      itemName: m.itemName,
-      quantity: m.quantity,
-      unitCost: m.unitCost ?? null,
-      totalCost: m.totalCost ?? null,
-      status: m.status,
-      lotNumber: m.lotNumber ?? null,
-      expireDate: m.expireDate ?? null,
-      supplierLotNo: m.supplierLotNo ?? null,
-      notes: m.notes ?? null,
-      createdBy: m.createdBy,
-    }))
+    const cardRows = catalog.map((item) => stockItemToCardValues(item))
 
-    const reservationRows = mockReservations.map((r) => ({
-      id: r.id,
-      stockCardId: r.stockCardId,
-      jobOrderId: r.jobOrderId,
-      jobNo: r.jobNo,
-      reservedQuantity: r.reservedQuantity,
-      status: r.status,
-    }))
+    // Initial ledger history (mapped from the simulation demo movement log).
+    const typeMap: Record<string, string> = { IN: "buy_in", OUT: "use_out", ADJUST: "adjust_in", RESERVE: "reserve" }
+    const movementRows = INIT_MOVEMENTS().map((m, i) => {
+      const item = resolve(m.item)
+      return {
+        id: `seed-mv-${i + 1}`,
+        referenceNumber: m.ref,
+        movementType: typeMap[m.type] ?? "adjust_in",
+        stockCardId: item?.id ?? "unknown",
+        itemCode: item?.code ?? "?",
+        itemName: item?.name ?? m.item,
+        quantity: Math.abs(m.qty),
+        status: "approved",
+        notes: m.note,
+        createdBy: "seed",
+      }
+    })
 
-    if (cardRows.length) await db.insert(stockCards).values(cardRows).onConflictDoNothing()
-    if (lotRows.length) await db.insert(stockLots).values(lotRows).onConflictDoNothing()
-    if (movementRows.length) await db.insert(stockMovements).values(movementRows).onConflictDoNothing()
-    if (reservationRows.length) await db.insert(stockReservations).values(reservationRows).onConflictDoNothing()
+    await db.transaction(async (tx) => {
+      // Clear existing rows (order-independent since there are no FK constraints).
+      await tx.delete(stockMovements)
+      await tx.delete(stockLots)
+      await tx.delete(stockReservations)
+      await tx.delete(stockCards)
+      await tx.delete(simWorkflow)
+
+      await tx.insert(stockCards).values(cardRows)
+      if (movementRows.length) await tx.insert(stockMovements).values(movementRows)
+
+      await tx.insert(simWorkflow).values({
+        id: "default",
+        purchaseOrders: INIT_POS(),
+        jobReservations: INIT_JOBS(),
+        savedReservations: [],
+        receiveRecords: [],
+        docCounters: { SSI: 0, SRE: 0, SIN: 5, SRR: 0 },
+      })
+    })
 
     return NextResponse.json({
       ok: true,
-      seeded: {
-        stockCards: cardRows.length,
-        stockLots: lotRows.length,
-        stockMovements: movementRows.length,
-        stockReservations: reservationRows.length,
-      },
+      seeded: { stockCards: cardRows.length, stockMovements: movementRows.length, simWorkflow: 1 },
     })
   } catch (err) {
     console.error("[v0] seed error:", err)
