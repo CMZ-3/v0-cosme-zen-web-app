@@ -13,16 +13,23 @@ import {
   FileText, ShieldCheck, Briefcase, MessageSquare,
   ClipboardList, Package, Palette, ScrollText,
   AlertTriangle, Clock, Star, Download, Plus,
-  Pencil, CheckCircle, XCircle, CalendarDays,
+  Pencil, CheckCircle, XCircle, CalendarDays, Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
+import { exportCustomerToPdf } from "@/lib/export-pdf"
 
 type TabKey = "overview" | "contacts" | "addresses" | "brands" | "documents" | "contracts" | "briefs" | "complaints" | "contact-logs" | "fda" | "lots"
 
 interface CustomerDetailPanelProps {
   detail: CustomerDetail | null
   customerName?: string
+  onEdit?: () => void
+  onDelete?: (id: string, name: string) => void
 }
 
 // --- KPI Stat Card ---
@@ -46,8 +53,9 @@ function Field({ label, value, mono }: { label: string; value?: string | null; m
   )
 }
 
-export function CustomerDetailPanel({ detail, customerName }: CustomerDetailPanelProps) {
+export function CustomerDetailPanel({ detail, customerName, onEdit, onDelete }: CustomerDetailPanelProps) {
   const [tab, setTab] = useState<TabKey>("overview")
+  const [showDelete, setShowDelete] = useState(false)
 
   if (!detail) {
     return (
@@ -105,8 +113,9 @@ export function CustomerDetailPanel({ detail, customerName }: CustomerDetailPane
           {/* Right -- Credit Meter + Actions */}
           <div className="flex flex-col items-end gap-2 shrink-0">
   <div className="flex items-center gap-2">
-<Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5" onClick={() => toast.info(`Editing ${detail.customerName}`)}><Pencil className="h-3 w-3" /> Edit</Button>
-<Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5" onClick={() => toast.success(`Exporting ${detail.customerCode} to PDF...`)}><Download className="h-3 w-3" /> Export</Button>
+<Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5" onClick={() => onEdit?.()}><Pencil className="h-3 w-3" /> Edit</Button>
+<Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5" onClick={() => { exportCustomerToPdf(detail); toast.success(`กำลังส่งออก ${detail.customerCode} เป็น PDF`) }}><Download className="h-3 w-3" /> Export</Button>
+<Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5 text-destructive hover:text-destructive" onClick={() => setShowDelete(true)}><Trash2 className="h-3 w-3" /> Delete</Button>
   </div>
             {detail.creditLimit && (
               <div className="w-[160px]">
@@ -177,6 +186,26 @@ export function CustomerDetailPanel({ detail, customerName }: CustomerDetailPane
         {tab === "fda" && <PlaceholderTab label="FDA Registrations" description="FDA registration linking will be available in a future update." />}
         {tab === "lots" && <PlaceholderTab label="Lots & Batches" description="Lot tracking and cross-module views will be available in a future update." />}
       </div>
+
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบลูกค้า</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ &quot;{detail.customerName}&quot; อย่างถาวรใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { onDelete?.(detail.id, detail.customerName); setShowDelete(false) }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -2,17 +2,21 @@
 
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
-import { Search, Plus, Building, User, MoreHorizontal, Pencil, Archive, Eye } from "lucide-react"
+import { Search, Plus, Building, User, MoreHorizontal, Pencil, Archive, Eye, Trash2 } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useToast } from "@/hooks/use-toast"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import type { CustomerListItem, CustomerTier } from "@/lib/customer-types"
-import { TIER_MAP, BUSINESS_TYPE_MAP } from "@/lib/customer-types"
+import type { CustomerListItem } from "@/lib/customer-types"
+import { TIER_MAP } from "@/lib/customer-types"
 
 type FilterTab = "all" | "platinum" | "gold" | "silver" | "standard"
 
@@ -21,12 +25,15 @@ interface CustomerListPanelProps {
   selectedId: string | null
   onSelect: (id: string) => void
   onNewClick: () => void
+  onEditRequest: (id: string) => void
+  onArchive: (id: string, name: string) => void
+  onDelete: (id: string, name: string) => void
 }
 
-export function CustomerListPanel({ customers, selectedId, onSelect, onNewClick }: CustomerListPanelProps) {
-  const { toast } = useToast()
+export function CustomerListPanel({ customers, selectedId, onSelect, onNewClick, onEditRequest, onArchive, onDelete }: CustomerListPanelProps) {
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("all")
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
 
   const counts = useMemo(() => ({
     all: customers.filter(c => c.isActive).length,
@@ -151,11 +158,15 @@ export function CustomerListPanel({ customers, selectedId, onSelect, onNewClick 
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(c.id) }}>
                         <Eye className="mr-2 h-3.5 w-3.5" /> View
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast({ title: "Edit Customer", description: c.customerName }) }}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditRequest(c.id) }}>
                         <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-amber-600 focus:text-amber-600" onClick={(e) => { e.stopPropagation(); toast({ title: "Archived", description: `${c.customerName} archived` }) }}>
+                      <DropdownMenuItem className="text-amber-600 focus:text-amber-600" onClick={(e) => { e.stopPropagation(); onArchive(c.id, c.customerName) }}>
                         <Archive className="mr-2 h-3.5 w-3.5" /> Archive
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: c.id, name: c.customerName }) }}>
+                        <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -182,6 +193,29 @@ export function CustomerListPanel({ customers, selectedId, onSelect, onNewClick 
           )
         })}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบลูกค้า</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ &quot;{deleteTarget?.name}&quot; อย่างถาวรใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) onDelete(deleteTarget.id, deleteTarget.name)
+                setDeleteTarget(null)
+              }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

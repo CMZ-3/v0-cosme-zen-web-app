@@ -111,6 +111,32 @@ export async function createCustomer(
   return rows[0]
 }
 
+export async function updateCustomer(
+  id: string,
+  data: Partial<Omit<CustomerRow, "id" | "customerCode" | "createdAt" | "updatedAt">>
+): Promise<CustomerRow | null> {
+  const rows = await db
+    .update(customers)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(customers.id, id))
+    .returning()
+  return rows[0] ?? null
+}
+
+export async function deleteCustomer(id: string): Promise<boolean> {
+  const rows = await db.delete(customers).where(eq(customers.id, id)).returning()
+  return rows.length > 0
+}
+
+export async function setCustomerActive(id: string, isActive: boolean): Promise<CustomerRow | null> {
+  const rows = await db
+    .update(customers)
+    .set({ isActive, updatedAt: new Date() })
+    .where(eq(customers.id, id))
+    .returning()
+  return rows[0] ?? null
+}
+
 // ─── Suppliers ──────────────────────────────────────────────────────────────
 
 function rowToSupplier(r: SupplierRow): SupplierListItem {
@@ -211,4 +237,39 @@ export async function createSupplier(
 ): Promise<SupplierRow> {
   const rows = await db.insert(suppliers).values(data).returning()
   return rows[0]
+}
+
+export async function updateSupplier(
+  id: string,
+  data: Partial<Omit<SupplierRow, "id" | "supplierCode" | "createdAt" | "updatedAt">>
+): Promise<SupplierRow | null> {
+  const rows = await db
+    .update(suppliers)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(suppliers.id, id))
+    .returning()
+  return rows[0] ?? null
+}
+
+export async function deleteSupplier(id: string): Promise<boolean> {
+  const rows = await db.delete(suppliers).where(eq(suppliers.id, id)).returning()
+  return rows.length > 0
+}
+
+export async function setSupplierActive(id: string, isActive: boolean): Promise<SupplierRow | null> {
+  const rows = await db
+    .update(suppliers)
+    .set({ isActive, updatedAt: new Date() })
+    .where(eq(suppliers.id, id))
+    .returning()
+  return rows[0] ?? null
+}
+
+export async function setSupplierApproved(id: string, isApproved: boolean): Promise<SupplierRow | null> {
+  const rows = await db
+    .update(suppliers)
+    .set({ isApproved, updatedAt: new Date() })
+    .where(eq(suppliers.id, id))
+    .returning()
+  return rows[0] ?? null
 }
