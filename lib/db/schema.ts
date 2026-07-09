@@ -368,6 +368,7 @@ export const products = pgTable("products", {
   status: text("status").notNull().default("draft"),
   packageSize: text("packageSize"),
   containerType: text("containerType").notNull().default("bottle"),
+  lots: jsonb("lots").notNull().default([]),
   createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
 })

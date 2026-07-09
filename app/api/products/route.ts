@@ -33,6 +33,7 @@ export async function POST(req: Request) {
       status: body.status ?? "draft",
       packageSize: body.packageSize ?? null,
       containerType: body.containerType ?? "bottle",
+      lots: [],
     })
     return NextResponse.json({ product: row }, { status: 201 })
   } catch (err) {
