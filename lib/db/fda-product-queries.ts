@@ -217,6 +217,11 @@ export async function addFdaManufacturingStep(data: Omit<FdaManufacturingStep, "
   return rows[0] as unknown as FdaManufacturingStep
 }
 
+export async function updateFdaManufacturingStep(id: string, data: Partial<FdaManufacturingStep>): Promise<boolean> {
+  const rows = await db.update(fdaManufacturingSteps).set(data).where(eq(fdaManufacturingSteps.id, id)).returning()
+  return rows.length > 0
+}
+
 export async function deleteFdaManufacturingStep(id: string): Promise<boolean> {
   const rows = await db.delete(fdaManufacturingSteps).where(eq(fdaManufacturingSteps.id, id)).returning()
   return rows.length > 0
@@ -226,6 +231,11 @@ export async function addFdaRawMaterialSpec(data: Omit<FdaRawMaterialSpec, "id">
   const { nanoid } = await import("nanoid")
   const rows = await db.insert(fdaRawMaterialSpecs).values({ ...data, id: nanoid(12) }).returning()
   return rows[0] as unknown as FdaRawMaterialSpec
+}
+
+export async function updateFdaRawMaterialSpec(id: string, data: Partial<FdaRawMaterialSpec>): Promise<boolean> {
+  const rows = await db.update(fdaRawMaterialSpecs).set(data).where(eq(fdaRawMaterialSpecs.id, id)).returning()
+  return rows.length > 0
 }
 
 export async function deleteFdaRawMaterialSpec(id: string): Promise<boolean> {

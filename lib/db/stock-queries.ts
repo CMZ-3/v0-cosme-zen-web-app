@@ -141,6 +141,11 @@ export async function getStockMovements(stockCardId?: string): Promise<StockMove
   return rows.map(toMovement)
 }
 
+export async function updateStockMovement(id: string, data: Partial<{ notes: string; status: string }>): Promise<boolean> {
+  const rows = await db.update(stockMovements).set(data).where(eq(stockMovements.id, id)).returning()
+  return rows.length > 0
+}
+
 export async function deleteStockMovement(id: string): Promise<boolean> {
   const rows = await db.delete(stockMovements).where(eq(stockMovements.id, id)).returning()
   return rows.length > 0
