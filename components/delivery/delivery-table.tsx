@@ -22,8 +22,23 @@ import {
 } from "@/components/ui/table"
 import type { DeliveryOrder, DeliveryStatus } from "@/lib/delivery-types"
 import { deliveryStatusMap } from "@/lib/delivery-types"
-import { customerAvatarColors } from "@/lib/delivery-mock-data"
 import { cn } from "@/lib/utils"
+
+function getAvatarColor(name: string): string {
+  const palettes = [
+    "from-blue-400 to-blue-600",
+    "from-teal-400 to-teal-600",
+    "from-violet-400 to-violet-600",
+    "from-rose-400 to-rose-600",
+    "from-amber-400 to-amber-600",
+    "from-emerald-400 to-emerald-600",
+    "from-indigo-400 to-indigo-600",
+    "from-pink-400 to-pink-600",
+  ]
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return palettes[h % palettes.length]
+}
 
 const statusFilters: { value: DeliveryStatus | "all" | "pending_close"; label: string }[] = [
   { value: "all", label: "All" },
@@ -187,7 +202,7 @@ export function DeliveryTable({ data, onRowClick, onStatusChange }: DeliveryTabl
             <TableBody>
               {paged.map((row) => {
                 const statusInfo = deliveryStatusMap[row.status]
-                const avatarColor = customerAvatarColors[row.customerName] || "from-gray-400 to-gray-600"
+                const avatarColor = getAvatarColor(row.customerName)
                 const overdue = isOverdue(row.deliveryDate, row.status)
                 return (
                   <TableRow

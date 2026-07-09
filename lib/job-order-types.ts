@@ -50,6 +50,7 @@ export interface Batch {
 
 export interface MaterialCheck {
   id: string
+  stockCardId?: string
   name: string
   requiredQty: number
   requiredUnit: string

@@ -5,8 +5,7 @@ import useSWR from "swr"
 import { CustomerListPanel } from "@/components/customers/customer-list-panel"
 import { CustomerDetailPanel } from "@/components/customers/customer-detail-panel"
 import { CreateCustomerDialog } from "@/components/customers/create-customer-dialog"
-import { mockCustomerDetail } from "@/lib/customer-mock-data"
-import type { CustomerListItem } from "@/lib/customer-types"
+import type { CustomerDetail, CustomerListItem } from "@/lib/customer-types"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -17,9 +16,16 @@ export default function CustomersPage() {
   const { data, mutate } = useSWR<{ customers: CustomerListItem[] }>("/api/customers", fetcher)
   const list = data?.customers ?? []
 
-  // Auto-select first on load
   const effectiveSelected = selectedId ?? list[0]?.id ?? null
-  const detail = effectiveSelected === list[0]?.id ? mockCustomerDetail : null
+
+  const { data: detailData, isLoading: detailLoading } = useSWR<{ detail: CustomerDetail }>(
+    effectiveSelected ? `/api/customers/${effectiveSelected}` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const detail = detailData?.detail ?? null
+  const selectedName = list.find((c) => c.id === effectiveSelected)?.customerName
 
   return (
     <>
@@ -36,7 +42,7 @@ export default function CustomersPage() {
       />
       <CustomerDetailPanel
         detail={detail}
-        customerName={list.find((c) => c.id === effectiveSelected)?.customerName}
+        customerName={detailLoading ? selectedName : selectedName}
       />
     </>
   )

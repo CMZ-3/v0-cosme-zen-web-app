@@ -2,8 +2,8 @@ import { db } from "@/lib/db"
 import { customers, suppliers } from "@/lib/db/schema"
 import { eq, desc, ilike, or } from "drizzle-orm"
 import type { CustomerRow, SupplierRow } from "@/lib/db/schema"
-import type { CustomerListItem, CustomerKPI } from "@/lib/customer-types"
-import type { SupplierListItem, SupplierKPI } from "@/lib/supplier-types"
+import type { CustomerListItem, CustomerDetail, CustomerKPI } from "@/lib/customer-types"
+import type { SupplierListItem, SupplierDetail, SupplierKPI } from "@/lib/supplier-types"
 
 // ─── Customers ──────────────────────────────────────────────────────────────
 
@@ -52,6 +52,40 @@ export async function listCustomers(search?: string): Promise<CustomerListItem[]
 export async function getCustomerById(id: string): Promise<CustomerListItem | null> {
   const rows = await db.select().from(customers).where(eq(customers.id, id)).limit(1)
   return rows[0] ? rowToCustomer(rows[0]) : null
+}
+
+export async function getCustomerDetail(id: string): Promise<CustomerDetail | null> {
+  const rows = await db.select().from(customers).where(eq(customers.id, id)).limit(1)
+  if (!rows[0]) return null
+  const r = rows[0]
+  return {
+    // CustomerListItem fields
+    ...rowToCustomer(r),
+    // Extended detail fields from the full DB row
+    address: r.address ?? undefined,
+    city: r.city ?? undefined,
+    postalCode: r.postalCode ?? undefined,
+    taxId: r.taxId ?? undefined,
+    branchCode: undefined,
+    creditDays: r.creditDays,
+    salesRepresentative: r.salesRepresentative ?? undefined,
+    website: r.website ?? undefined,
+    fax: undefined,
+    lineId: undefined,
+    logoUrl: undefined,
+    notes: r.notes ?? undefined,
+    createdAt: r.createdAt.toISOString().slice(0, 10),
+    updatedAt: r.updatedAt.toISOString().slice(0, 10),
+    // Sub-arrays — populated from separate tables once they exist
+    contacts: [],
+    addresses: [],
+    brands: [],
+    contracts: [],
+    briefs: [],
+    complaints: [],
+    contactLogs: [],
+    documents: [],
+  }
 }
 
 export async function getCustomerKPI(): Promise<CustomerKPI> {
@@ -122,6 +156,34 @@ export async function listSuppliers(search?: string): Promise<SupplierListItem[]
 export async function getSupplierById(id: string): Promise<SupplierListItem | null> {
   const rows = await db.select().from(suppliers).where(eq(suppliers.id, id)).limit(1)
   return rows[0] ? rowToSupplier(rows[0]) : null
+}
+
+export async function getSupplierDetail(id: string): Promise<SupplierDetail | null> {
+  const rows = await db.select().from(suppliers).where(eq(suppliers.id, id)).limit(1)
+  if (!rows[0]) return null
+  const r = rows[0]
+  return {
+    ...rowToSupplier(r),
+    description: r.description ?? undefined,
+    address: r.address ?? undefined,
+    taxId: r.taxId ?? undefined,
+    branchCode: undefined,
+    paymentTerms: r.paymentTerms ?? undefined,
+    paymentDays: r.paymentDays,
+    website: r.website ?? undefined,
+    fax: undefined,
+    notes: r.notes ?? undefined,
+    avgLeadTimeDays: r.avgLeadTimeDays ?? undefined,
+    ytdOrderValue: r.ytdOrderValue ?? undefined,
+    moq: r.moq ?? undefined,
+    onTimeDeliveryPct: r.onTimeDeliveryPct ?? undefined,
+    contacts: [],
+    addresses: [],
+    certificates: [],
+    catalogItems: [],
+    documents: [],
+    coaList: [],
+  }
 }
 
 export async function getSupplierKPI(): Promise<SupplierKPI> {

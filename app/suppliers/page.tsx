@@ -5,8 +5,7 @@ import useSWR from "swr"
 import { SupplierListPanel } from "@/components/suppliers/supplier-list-panel"
 import { SupplierDetailPanel } from "@/components/suppliers/supplier-detail-panel"
 import { CreateSupplierDialog } from "@/components/suppliers/create-supplier-dialog"
-import { mockSupplierDetail } from "@/lib/supplier-mock-data"
-import type { SupplierListItem } from "@/lib/supplier-types"
+import type { SupplierDetail, SupplierListItem } from "@/lib/supplier-types"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -18,7 +17,15 @@ export default function SuppliersPage() {
   const list = data?.suppliers ?? []
 
   const effectiveSelected = selectedId ?? list[0]?.id ?? null
-  const detail = effectiveSelected === list[0]?.id ? mockSupplierDetail : null
+
+  const { data: detailData } = useSWR<{ detail: SupplierDetail }>(
+    effectiveSelected ? `/api/suppliers/${effectiveSelected}` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const detail = detailData?.detail ?? null
+  const selectedName = list.find((s) => s.id === effectiveSelected)?.supplierName
 
   return (
     <>
@@ -35,7 +42,7 @@ export default function SuppliersPage() {
       />
       <SupplierDetailPanel
         detail={detail}
-        supplierName={list.find((s) => s.id === effectiveSelected)?.supplierName}
+        supplierName={selectedName}
       />
     </>
   )

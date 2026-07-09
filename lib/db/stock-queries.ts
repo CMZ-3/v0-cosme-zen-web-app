@@ -9,7 +9,7 @@ import {
   type StockMovementRow,
   type StockReservationRow,
 } from "@/lib/db/schema"
-import { asc, desc, eq } from "drizzle-orm"
+import { and, asc, desc, eq } from "drizzle-orm"
 import type {
   StockCard,
   StockLot,
@@ -141,9 +141,21 @@ export async function getStockMovements(stockCardId?: string): Promise<StockMove
   return rows.map(toMovement)
 }
 
-export async function getStockReservations(stockCardId?: string): Promise<StockReservation[]> {
-  const rows = stockCardId
-    ? await db.select().from(stockReservations).where(eq(stockReservations.stockCardId, stockCardId))
-    : await db.select().from(stockReservations)
+export async function getStockReservations(
+  stockCardId?: string,
+  jobOrderId?: string,
+): Promise<StockReservation[]> {
+  const conditions = [
+    stockCardId ? eq(stockReservations.stockCardId, stockCardId) : undefined,
+    jobOrderId ? eq(stockReservations.jobOrderId, jobOrderId) : undefined,
+  ].filter(Boolean) as ReturnType<typeof eq>[]
+
+  const rows =
+    conditions.length > 0
+      ? await db
+          .select()
+          .from(stockReservations)
+          .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+      : await db.select().from(stockReservations)
   return rows.map(toReservation)
 }

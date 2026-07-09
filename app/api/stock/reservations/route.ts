@@ -6,7 +6,8 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const stockCardId = searchParams.get("stockCardId") ?? undefined
-    const reservations = await getStockReservations(stockCardId)
+    const jobOrderId = searchParams.get("jobOrderId") ?? undefined
+    const reservations = await getStockReservations(stockCardId, jobOrderId)
     return NextResponse.json({ reservations })
   } catch (err) {
     console.error("[v0] GET /api/stock/reservations error:", err)

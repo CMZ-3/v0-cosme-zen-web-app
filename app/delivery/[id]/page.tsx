@@ -3,6 +3,7 @@
 import { use, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import useSWR from "swr"
 import {
   ArrowLeft,
   PackageCheck,
@@ -41,14 +42,32 @@ import { PickVerifyDialog } from "@/components/delivery/pick-verify-dialog"
 import { deliveryStatusMap } from "@/lib/delivery-types"
 import type { DeliveryStatus } from "@/lib/delivery-types"
 import {
-  mockDeliveryOrders,
   mockDeliveryLines,
   mockDeliveryAuditLogs,
   mockDeliveryPod,
-  customerAvatarColors,
 } from "@/lib/delivery-mock-data"
+import type { DeliveryOrder } from "@/lib/delivery-types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+// Derive a deterministic gradient from a customer name for the avatar
+function getAvatarColor(name: string): string {
+  const palettes = [
+    "from-blue-400 to-blue-600",
+    "from-teal-400 to-teal-600",
+    "from-violet-400 to-violet-600",
+    "from-rose-400 to-rose-600",
+    "from-amber-400 to-amber-600",
+    "from-emerald-400 to-emerald-600",
+    "from-indigo-400 to-indigo-600",
+    "from-pink-400 to-pink-600",
+  ]
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return palettes[h % palettes.length]
+}
 
 export default function DeliveryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -56,13 +75,29 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
   const [activeTab, setActiveTab] = useState("overview")
   const [verifyMode, setVerifyMode] = useState<"picking" | "shipping" | null>(null)
 
-  const order = useMemo(() => mockDeliveryOrders.find((o) => o.id === id), [id])
+  const { data, isLoading, mutate } = useSWR<{ order: DeliveryOrder }>(
+    `/api/delivery-orders/${id}`,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const order = data?.order ?? null
+
   const orderLines = useMemo(() => {
     const matched = mockDeliveryLines.filter((l) => l.deliveryOrderId === id)
-    // Mock data only populates lines for some orders; fall back to the shared
-    // sample lines (mirrors the Lines tab) so verification stays demonstrable.
     return matched.length > 0 ? matched : mockDeliveryLines
   }, [id])
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="mt-3 text-sm text-muted-foreground">Loading delivery order...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!order) {
     return (
@@ -78,7 +113,7 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
   }
 
   const statusInfo = deliveryStatusMap[order.status]
-  const avatarColor = customerAvatarColors[order.customerName] || "from-gray-400 to-gray-600"
+  const avatarColor = getAvatarColor(order.customerName)
   const initials = order.customerName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
 
   const formatDate = (dateStr?: string) => {
@@ -117,13 +152,14 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
             variant={a.variant}
             size="sm"
             className={cn("gap-1.5 rounded-[10px] text-[12px] font-semibold", a.variant === "default" && a.color && `${a.color} text-white`)}
-            onClick={() => {
+            onClick={async () => {
               if (a.label === "Start Picking" && orderLines.length > 0) {
                 setVerifyMode("picking")
               } else if (a.label === "Ship" && orderLines.length > 0) {
                 setVerifyMode("shipping")
               } else {
                 toast.success(`${a.label}: ${order.deliveryNumber}`)
+                await mutate()
               }
             }}
           >

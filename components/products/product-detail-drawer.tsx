@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, Fragment } from "react"
+import useSWR from "swr"
 import {
   Sheet,
   SheetContent,
@@ -47,8 +48,8 @@ import {
   ChevronRight,
   ArrowRightLeft,
 } from "lucide-react"
-import { mockProductDetail, mockLots, mockAudit, mockSpecifications, mockAttributes, mockLotMovements, mockLotMovementSummary } from "@/lib/mock-data"
-import type { Product, ProductLot, AuditEntry, LotStatus, QCResult, QualityStatus, ProductSpecification, ProductAttribute, LotMovement, MovementType } from "@/lib/product-types"
+import { mockLots, mockAudit, mockSpecifications, mockAttributes, mockLotMovements, mockLotMovementSummary } from "@/lib/mock-data"
+import type { Product, ProductListItem, ProductLot, AuditEntry, LotStatus, QCResult, QualityStatus, ProductSpecification, ProductAttribute, LotMovement, MovementType } from "@/lib/product-types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -58,13 +59,31 @@ interface ProductDetailDrawerProps {
   productId: string | null
 }
 
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
 export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDetailDrawerProps) {
-  const product = mockProductDetail
+  const { data, isLoading } = useSWR<{ product: ProductListItem }>(
+    productId ? `/api/products/${productId}` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
   if (!productId) return null
+  // Cast to Product for sub-section compatibility; DB may not fill all fields
+  // so sub-sections fall back to "—" via optional chaining.
+  const product = data?.product as unknown as Product | undefined
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[720px] max-w-[720px] p-0 sm:max-w-[720px] gap-0">
+        {(isLoading || !product) ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <p className="mt-3 text-sm text-muted-foreground">{isLoading ? "Loading product..." : "Product not found"}</p>
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Hero Header */}
         <div className="shrink-0 border-b border-border bg-gradient-to-r from-secondary to-card px-6 py-5">
           <SheetHeader className="p-0 gap-0">
@@ -78,8 +97,8 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
                   <span className="font-mono font-bold text-primary">{product.sku}</span> - {product.packageSize} {product.containerType}
                 </SheetDescription>
                 <div className="mt-2 flex items-center gap-2">
-                  <Badge variant="outline" className="bg-[#ecfdf5] text-[#10b981] border-[#10b981]/20 text-[10px] font-bold">Active</Badge>
-                  <Badge variant="outline" className="bg-[#ecfdf5] text-[#10b981] border-[#10b981]/20 text-[10px] font-bold">FDA Approved</Badge>
+                  <Badge variant="outline" className={cn("text-[10px] font-bold", product.status === "active" ? "bg-[#ecfdf5] text-[#10b981] border-[#10b981]/20" : "bg-secondary text-muted-foreground")}>{product.status}</Badge>
+                  <Badge variant="outline" className={cn("text-[10px] font-bold", product.fdaStatus === "approved" ? "bg-[#ecfdf5] text-[#10b981] border-[#10b981]/20" : "bg-[#fffbeb] text-[#d97706] border-[#d97706]/20")}>{product.fdaStatus}</Badge>
                   <span className="text-[10px] text-muted-foreground">{product.customerName}</span>
                 </div>
               </div>
@@ -89,10 +108,10 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
           {/* Quick KPI */}
           <div className="mt-4 grid grid-cols-4 gap-2">
             {[
-              { label: "Total Produced", value: product.totalProduced.toLocaleString(), sub: "units" },
-              { label: "In Stock", value: product.inStockQty.toLocaleString(), sub: "units" },
-              { label: "Cost/Unit", value: `฿${product.totalCostPerUnit.toFixed(2)}`, sub: "COGS" },
-              { label: "Selling Price", value: product.sellingPrice ? `฿${product.sellingPrice}` : "-", sub: product.sellingPrice ? `Margin ${((1 - product.totalCostPerUnit / product.sellingPrice) * 100).toFixed(1)}%` : "" },
+              { label: "SKU", value: product!.sku, sub: "Product Code" },
+              { label: "Category", value: product!.category, sub: "Type" },
+              { label: "Cost/Unit", value: `฿${(product!.totalCostPerUnit ?? 0).toFixed(2)}`, sub: "COGS" },
+              { label: "Selling Price", value: product!.sellingPrice ? `฿${product!.sellingPrice}` : "--", sub: product!.sellingPrice && product!.totalCostPerUnit ? `Margin ${((1 - product!.totalCostPerUnit / product!.sellingPrice!) * 100).toFixed(1)}%` : "" },
             ].map((kpi, i) => (
               <div key={i} className="rounded-xl bg-card/80 border border-border p-2.5 text-center">
                 <div className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{kpi.label}</div>
@@ -161,6 +180,8 @@ Edit Product
             Edit Product
           </Button>
         </div>
+        </>
+        )}
       </SheetContent>
     </Sheet>
   )
