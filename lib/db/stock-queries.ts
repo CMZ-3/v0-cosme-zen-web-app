@@ -141,6 +141,11 @@ export async function getStockMovements(stockCardId?: string): Promise<StockMove
   return rows.map(toMovement)
 }
 
+export async function deleteStockMovement(id: string): Promise<boolean> {
+  const rows = await db.delete(stockMovements).where(eq(stockMovements.id, id)).returning()
+  return rows.length > 0
+}
+
 export async function getStockReservations(
   stockCardId?: string,
   jobOrderId?: string,

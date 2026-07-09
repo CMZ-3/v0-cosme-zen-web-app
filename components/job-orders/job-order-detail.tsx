@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Printer, Download, Pencil, FlaskConical, User, Package, DollarSign, Clock, Check, MoreHorizontal, Copy, Ban, PlayCircle, PauseCircle, CheckCircle2, ShieldCheck, PackageCheck, Truck } from "lucide-react"
 import {
@@ -104,13 +105,40 @@ interface Props {
 }
 
 export function JobOrderDetail({ jobOrder, onStatusChange }: Props) {
+  const router = useRouter()
   const [tab, setTab] = useState<DetailTab>("overview")
   const [currentStatus, setCurrentStatus] = useState<JOStatus>(jobOrder.status)
+  const [cloneBusy, setCloneBusy] = useState(false)
   const statusInfo = JO_STATUS_MAP[currentStatus]
 
   const stats = useMemo<TrackingStats>(() => computeStats(jobOrder), [jobOrder])
 
   const availableActions = ACTION_RULES.filter((a) => a.allowedFrom.includes(currentStatus))
+
+  const handlePrint = () => {
+    window.open(`/job-orders/${jobOrder.id}/print`, "_blank")
+  }
+
+  const handleDuplicate = async () => {
+    setCloneBusy(true)
+    try {
+      const res = await fetch(`/api/job-orders/${jobOrder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clone" }),
+      })
+      if (res.ok) {
+        const { id: newId } = await res.json()
+        toast.success(`Duplicate JO #${jobOrder.orderNumber} สำเร็จ`)
+        router.push(`/job-orders?id=${newId}`)
+        onStatusChange?.()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setCloneBusy(false)
+    }
+  }
 
   async function handleAction(rule: ActionDef) {
     if (rule.action === "cancel") {
@@ -188,18 +216,18 @@ export function JobOrderDetail({ jobOrder, onStatusChange }: Props) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => toast.success(`Printing JO #${jobOrder.orderNumber}...`)}>
+                <DropdownMenuItem onClick={handlePrint}>
                   <Printer className="mr-2 h-3.5 w-3.5" /> Print JO
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast.success(`Exporting JO #${jobOrder.orderNumber} to PDF...`)}>
+                <DropdownMenuItem onClick={handlePrint}>
                   <Download className="mr-2 h-3.5 w-3.5" /> Export PDF
                 </DropdownMenuItem>
                 {(currentStatus === "new" || currentStatus === "preparing_rm") && (
-                  <DropdownMenuItem onClick={() => toast.info(`Editing JO #${jobOrder.orderNumber}`)}>
+                  <DropdownMenuItem onClick={() => router.push(`/job-orders/${jobOrder.id}?edit=1`)}>
                     <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={() => toast.info(`Duplicating JO #${jobOrder.orderNumber}`)}>
+                <DropdownMenuItem disabled={cloneBusy} onClick={handleDuplicate}>
                   <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate
                 </DropdownMenuItem>
                 {availableActions.some(a => a.action === "cancel") && (

@@ -215,3 +215,48 @@ export async function createJobOrder(data: {
   })
   return id
 }
+
+export async function deleteJobOrder(id: string): Promise<boolean> {
+  const rows = await db.delete(jobOrders).where(eq(jobOrders.id, id)).returning()
+  return rows.length > 0
+}
+
+export async function cloneJobOrder(id: string): Promise<string | null> {
+  const rows = await db.select().from(jobOrders).where(eq(jobOrders.id, id)).limit(1)
+  if (!rows[0]) return null
+  const src = rows[0]
+  const newId = `jo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+  const year = new Date().getFullYear().toString().slice(2)
+  const month = String(new Date().getMonth() + 1).padStart(2, "0")
+  const seq = Math.floor(Math.random() * 900) + 100
+  const now = new Date()
+  await db.insert(jobOrders).values({
+    ...src,
+    id: newId,
+    jobNo: `JO-${year}${month}-${seq}`,
+    status: "new",
+    createdAt: now,
+    updatedAt: now,
+    productionNotes: null,
+  })
+  return newId
+}
+
+export async function updateJobOrder(
+  id: string,
+  data: Partial<{
+    formulaName: string
+    customer: string
+    batchSizeKg: number
+    plannedQty: number
+    unit: string
+    priority: string
+    plannedStart: string
+    plannedEnd: string
+    assignedTo: string
+    productionNotes: string
+  }>
+): Promise<boolean> {
+  const rows = await db.update(jobOrders).set({ ...data, updatedAt: new Date() }).where(eq(jobOrders.id, id)).returning()
+  return rows.length > 0
+}
