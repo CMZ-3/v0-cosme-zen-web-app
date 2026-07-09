@@ -253,3 +253,103 @@ export async function getFormulaVersions(formulaId: string): Promise<FormulaVers
     createdBy: r.createdBy ?? null,
   }))
 }
+
+// ---------------------------------------------------------------------------
+// Mutations
+// ---------------------------------------------------------------------------
+
+type FormulaStatus = "draft" | "approved" | "active" | "archived" | "discontinued"
+
+/** Update the status field of a formula. */
+export async function updateFormulaStatus(id: string, status: FormulaStatus): Promise<boolean> {
+  const rows = await db
+    .update(formulas)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(formulas.id, id))
+    .returning()
+  return rows.length > 0
+}
+
+/** Delete a formula (and its ingredients via ON DELETE CASCADE or explicit). */
+export async function deleteFormula(id: string): Promise<boolean> {
+  // Delete ingredients first (no cascade configured)
+  await db.delete(formulaIngredients).where(eq(formulaIngredients.formulaId, id))
+  const rows = await db.delete(formulas).where(eq(formulas.id, id)).returning()
+  return rows.length > 0
+}
+
+/** Clone a formula — copies header + ingredients with new ids/code. */
+export async function cloneFormula(id: string): Promise<Formula | null> {
+  const src = await getFormulaById(id)
+  if (!src) return null
+
+  // Generate new code / id
+  const existing = await db.select({ code: formulas.code }).from(formulas)
+  const maxNum = existing
+    .map((r) => { const m = r.code.match(/(\d+)$/); return m ? parseInt(m[1]) : 0 })
+    .reduce((a, b) => Math.max(a, b), 0)
+  const newNum = maxNum + 1
+  const newCode = `FRM-${String(newNum).padStart(3, "0")}`
+  const newId = `F-${String(newNum).padStart(3, "0")}`
+
+  // Clone ingredients
+  const srcIngredients = await getFormulaIngredients(id)
+
+  await db.transaction(async (tx) => {
+    const srcRow = await tx.select().from(formulas).where(eq(formulas.id, id)).limit(1)
+    if (!srcRow[0]) return
+    await tx.insert(formulas).values({
+      ...srcRow[0],
+      id: newId,
+      code: newCode,
+      status: "draft",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    if (srcIngredients.length) {
+      await tx.insert(formulaIngredients).values(
+        srcIngredients.map((ing, i) => ({
+          id: `FI-${newId}-${String(i + 1).padStart(2, "0")}`,
+          formulaId: newId,
+          sortOrder: ing.sortOrder ?? (i + 1),
+          rawMaterialName: ing.ingredientName,
+          supplier: null,
+          percentage: ing.percentage,
+          stockCardId: ing.stockCardId ?? null,
+          unit: "kg",
+          notes: ing.notes ?? null,
+        })),
+      )
+    }
+  })
+
+  return getFormulaById(newId)
+}
+
+/** Add a single ingredient to an existing formula. */
+export async function addFormulaIngredient(
+  formulaId: string,
+  data: { rawMaterialName: string; percentage: number; phase?: string; stockCardId?: string | null }
+): Promise<void> {
+  const existing = await db.select({ sortOrder: formulaIngredients.sortOrder })
+    .from(formulaIngredients).where(eq(formulaIngredients.formulaId, formulaId))
+  const nextOrder = (existing.reduce((m, r) => Math.max(m, r.sortOrder), 0)) + 1
+  const ingId = `FI-${formulaId}-${String(nextOrder).padStart(2, "0")}-${Date.now().toString(36)}`
+  await db.insert(formulaIngredients).values({
+    id: ingId,
+    formulaId,
+    sortOrder: nextOrder,
+    rawMaterialName: data.rawMaterialName,
+    supplier: null,
+    percentage: data.percentage,
+    stockCardId: data.stockCardId ?? null,
+    unit: "kg",
+    notes: null,
+  })
+}
+
+/** Delete a single ingredient row. */
+export async function deleteFormulaIngredient(ingId: string): Promise<boolean> {
+  const rows = await db.delete(formulaIngredients).where(eq(formulaIngredients.id, ingId)).returning()
+  return rows.length > 0
+}

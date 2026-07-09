@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { mutate } from "swr"
 import { cn } from "@/lib/utils"
 import { Search, SlidersHorizontal, Eye, Pencil, Copy, Trash2, MoreHorizontal, ArrowUpDown, ChevronDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -14,8 +16,13 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import type { Formula, FormulaStatus } from "@/lib/formula-types"
 import { formulaStatusLabel, formulaStatusColor, formulaTypeLabel } from "@/lib/formula-types"
+import { toast } from "sonner"
 
 const statusFilters: { key: FormulaStatus | "all"; label: string }[] = [
   { key: "all", label: "All" },
@@ -32,12 +39,51 @@ interface FormulaTableProps {
 }
 
 export function FormulaTable({ data, total }: FormulaTableProps) {
+  const router = useRouter()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<FormulaStatus | "all">("all")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
   const [sortField, setSortField] = useState<"formulaCode" | "formulaName" | "batchSize" | "ingredientCount" | "status">("formulaCode")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+  const [rowBusy, setRowBusy] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Formula | null>(null)
+
+  const handleClone = async (row: Formula) => {
+    setRowBusy(row.id)
+    try {
+      const res = await fetch(`/api/formulas/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clone" }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed")
+      const { formula } = await res.json()
+      toast.success(`Cloned as ${formula.formulaCode}`)
+      mutate("/api/formulas")
+      router.push(`/formulas/${formula.id}`)
+    } catch (e) {
+      toast.error("Clone failed", { description: String(e) })
+    } finally {
+      setRowBusy(null)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setRowBusy(deleteTarget.id)
+    try {
+      const res = await fetch(`/api/formulas/${deleteTarget.id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed")
+      toast.success(`Formula ${deleteTarget.formulaCode} deleted`)
+      mutate("/api/formulas")
+    } catch (e) {
+      toast.error("Delete failed", { description: String(e) })
+    } finally {
+      setRowBusy(null)
+      setDeleteTarget(null)
+    }
+  }
 
   const filtered = useMemo(() => {
     let list = [...data]
@@ -250,7 +296,7 @@ export function FormulaTable({ data, total }: FormulaTableProps) {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity" disabled={rowBusy === row.id}>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -261,17 +307,17 @@ export function FormulaTable({ data, total }: FormulaTableProps) {
                             </Link>
                           </DropdownMenuItem>
                           {row.status === "draft" && (
-                            <DropdownMenuItem className="gap-2 text-[12px]">
+                            <DropdownMenuItem className="gap-2 text-[12px]" onClick={() => router.push(`/formulas/${row.id}?edit=1`)}>
                               <Pencil className="h-3.5 w-3.5" /> Edit
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem className="gap-2 text-[12px]">
+                          <DropdownMenuItem className="gap-2 text-[12px]" onClick={() => handleClone(row)}>
                             <Copy className="h-3.5 w-3.5" /> Clone
                           </DropdownMenuItem>
                           {row.status === "draft" && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="gap-2 text-[12px] text-destructive focus:text-destructive">
+                              <DropdownMenuItem className="gap-2 text-[12px] text-destructive focus:text-destructive" onClick={() => setDeleteTarget(row)}>
                                 <Trash2 className="h-3.5 w-3.5" /> Delete
                               </DropdownMenuItem>
                             </>
@@ -297,6 +343,27 @@ export function FormulaTable({ data, total }: FormulaTableProps) {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Formula</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.formulaCode}</strong>? This will permanently remove the formula and all its ingredients.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

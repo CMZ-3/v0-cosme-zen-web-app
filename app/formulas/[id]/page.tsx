@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useState } from "react"
-import useSWR from "swr"
+import useSWR, { mutate as globalMutate } from "swr"
 import { cn } from "@/lib/utils"
 import {
   ArrowLeft, ChevronRight, Pencil, Copy, Trash2, CheckCircle, Zap, Archive, Undo2,
@@ -15,6 +15,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import type {
   Formula, FormulaIngredient, FormulaPhase, FormulaProcessingStep,
   FormulaQcSpec, FormulaVersion,
@@ -38,16 +42,67 @@ export default function FormulaDetailPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
-  const { data, error, isLoading } = useSWR<FormulaDetailResponse>(
-    id ? `/api/formulas/${id}` : null,
-    fetcher,
-  )
+  const swrKey = id ? `/api/formulas/${id}` : null
+  const { data, error, isLoading, mutate } = useSWR<FormulaDetailResponse>(swrKey, fetcher)
   const formula = data?.formula
   const ingredients = data?.ingredients ?? []
   const phases = data?.phases ?? []
   const steps = data?.steps ?? []
   const qcSpecs = data?.qcSpecs ?? []
   const versions = data?.versions ?? []
+
+  const [actionBusy, setActionBusy] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const patchAction = async (action: string, extraLabel?: string) => {
+    if (!formula) return
+    setActionBusy(action)
+    try {
+      const res = await fetch(`/api/formulas/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "status"
+          ? { action: "status", status: extraLabel }
+          : { action }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? "Request failed")
+      }
+      const json = await res.json()
+      if (action === "clone") {
+        toast.success(`Formula cloned as ${json.formula.formulaCode}`)
+        router.push(`/formulas/${json.formula.id}`)
+        globalMutate("/api/formulas")
+      } else {
+        toast.success(`Formula ${json.formula?.formulaCode ?? formula.formulaCode} updated`)
+        mutate()
+        globalMutate("/api/formulas")
+      }
+    } catch (e) {
+      toast.error("Error", { description: String(e) })
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!formula) return
+    setActionBusy("delete")
+    try {
+      const res = await fetch(`/api/formulas/${id}`, { method: "DELETE" })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? "Delete failed")
+      }
+      toast.success(`Formula ${formula.formulaCode} deleted`)
+      globalMutate("/api/formulas")
+      router.push("/formulas")
+    } catch (e) {
+      toast.error("Delete failed", { description: String(e) })
+      setActionBusy(null)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -107,35 +162,48 @@ export default function FormulaDetailPage() {
           <div className="flex items-center gap-1.5 shrink-0">
             {/* Status action buttons */}
             {formula.status === "draft" && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => toast.success(`Formula ${formula.formulaCode} approved`)}>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-blue-600 border-blue-200 hover:bg-blue-50"
+                disabled={actionBusy === "status"}
+                onClick={() => patchAction("status", "approved")}>
                 <CheckCircle className="h-3.5 w-3.5" /> Approve
               </Button>
             )}
             {formula.status === "approved" && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => toast.success(`Formula ${formula.formulaCode} activated`)}>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                disabled={actionBusy === "status"}
+                onClick={() => patchAction("status", "active")}>
                 <Zap className="h-3.5 w-3.5" /> Activate
               </Button>
             )}
             {formula.status === "active" && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-muted-foreground" onClick={() => toast.info(`Formula ${formula.formulaCode} archived`)}>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-muted-foreground"
+                disabled={actionBusy === "status"}
+                onClick={() => patchAction("status", "archived")}>
                 <Archive className="h-3.5 w-3.5" /> Archive
               </Button>
             )}
             {["approved", "active", "archived"].includes(formula.status) && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => toast.warning(`Formula ${formula.formulaCode} reverted to draft`)}>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-amber-600 border-amber-200 hover:bg-amber-50"
+                disabled={actionBusy === "status"}
+                onClick={() => patchAction("status", "draft")}>
                 <Undo2 className="h-3.5 w-3.5" /> Revert
               </Button>
             )}
             {isDraft && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl" onClick={() => toast.info(`Editing formula ${formula.formulaCode}`)}>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl"
+                onClick={() => router.push(`/formulas/${id}?edit=1`)}>
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </Button>
             )}
-            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl" onClick={() => toast.success(`Formula ${formula.formulaCode} cloned`)}>
+            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl"
+              disabled={actionBusy === "clone"}
+              onClick={() => patchAction("clone")}>
               <Copy className="h-3.5 w-3.5" /> Clone
             </Button>
             {isDraft && (
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-destructive border-destructive/30 hover:bg-destructive/5">
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-[11px] rounded-xl text-destructive border-destructive/30 hover:bg-destructive/5"
+                disabled={actionBusy === "delete"}
+                onClick={() => setShowDeleteConfirm(true)}>
                 <Trash2 className="h-3.5 w-3.5" /> Delete
               </Button>
             )}
@@ -179,7 +247,7 @@ export default function FormulaDetailPage() {
 
           {/* ===== INGREDIENTS ===== */}
           <TabsContent value="ingredients" className="m-0 p-6">
-            <IngredientsTab isDraft={isDraft} data={ingredients} />
+            <IngredientsTab isDraft={isDraft} data={ingredients} formulaId={id} onRefresh={mutate} />
           </TabsContent>
 
           {/* ===== PHASES & STEPS ===== */}
@@ -223,6 +291,27 @@ export default function FormulaDetailPage() {
           </TabsContent>
         </div>
       </Tabs>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Formula</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{formula.formulaCode}</strong>? This action cannot be undone and will also remove all ingredients.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -317,10 +406,66 @@ function OverviewTab({ formula }: { formula: Formula }) {
 /* ============================================================================
    INGREDIENTS TAB
    ============================================================================ */
-function IngredientsTab({ isDraft, data }: { isDraft: boolean; data: FormulaIngredient[] }) {
+function IngredientsTab({
+  isDraft, data, formulaId, onRefresh,
+}: {
+  isDraft: boolean
+  data: FormulaIngredient[]
+  formulaId: string
+  onRefresh: () => void
+}) {
   const totalPct = data.reduce((s, i) => s + i.percentage, 0)
   const isBalanced = Math.abs(totalPct - 100) < 0.01
   const linkedCount = data.filter((i) => i.stockCardId).length
+
+  const [showAdd, setShowAdd] = useState(false)
+  const [addName, setAddName] = useState("")
+  const [addPct, setAddPct] = useState("")
+  const [addPhase, setAddPhase] = useState("A")
+  const [addBusy, setAddBusy] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<FormulaIngredient | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+
+  const handleAdd = async () => {
+    if (!addName.trim() || !addPct) return
+    setAddBusy(true)
+    try {
+      const res = await fetch(`/api/formulas/${formulaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add_ingredient", rawMaterialName: addName.trim(), percentage: parseFloat(addPct), phase: addPhase }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed")
+      toast.success("Ingredient added")
+      setShowAdd(false)
+      setAddName(""); setAddPct(""); setAddPhase("A")
+      onRefresh()
+    } catch (e) {
+      toast.error("Failed to add ingredient", { description: String(e) })
+    } finally {
+      setAddBusy(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleteBusy(true)
+    try {
+      const res = await fetch(`/api/formulas/${formulaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_ingredient", ingredientId: deleteTarget.id }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed")
+      toast.success(`Ingredient "${deleteTarget.ingredientName}" removed`)
+      onRefresh()
+    } catch (e) {
+      toast.error("Failed to delete ingredient", { description: String(e) })
+    } finally {
+      setDeleteBusy(false)
+      setDeleteTarget(null)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -340,11 +485,52 @@ function IngredientsTab({ isDraft, data }: { isDraft: boolean; data: FormulaIngr
         </div>
         {isDraft && (
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="h-8 text-[11px] rounded-xl gap-1.5"><Plus className="h-3.5 w-3.5" /> Add</Button>
-            <Button size="sm" variant="outline" className="h-8 text-[11px] rounded-xl gap-1.5"><Layers className="h-3.5 w-3.5" /> Bulk Add</Button>
+            <Button size="sm" variant="outline" className="h-8 text-[11px] rounded-xl gap-1.5" onClick={() => setShowAdd((v) => !v)}>
+              <Plus className="h-3.5 w-3.5" /> Add
+            </Button>
           </div>
         )}
       </div>
+
+      {/* Inline add-row form */}
+      {showAdd && isDraft && (
+        <div className="flex items-end gap-3 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-4">
+          <div className="flex-1 space-y-1">
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Ingredient Name *</label>
+            <input
+              className="flex h-8 w-full rounded-lg border border-input bg-background px-3 text-[12px] focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="e.g. Sodium Hyaluronate"
+              value={addName}
+              onChange={(e) => setAddName(e.target.value)}
+            />
+          </div>
+          <div className="w-24 space-y-1">
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">% *</label>
+            <input
+              type="number"
+              step="0.01"
+              className="flex h-8 w-full rounded-lg border border-input bg-background px-3 text-[12px] focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="0.00"
+              value={addPct}
+              onChange={(e) => setAddPct(e.target.value)}
+            />
+          </div>
+          <div className="w-20 space-y-1">
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Phase</label>
+            <select
+              className="flex h-8 w-full rounded-lg border border-input bg-background px-3 text-[12px]"
+              value={addPhase}
+              onChange={(e) => setAddPhase(e.target.value)}
+            >
+              {["A", "B", "C", "D", "E"].map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <Button size="sm" className="h-8 text-[11px] rounded-xl" disabled={addBusy || !addName.trim() || !addPct} onClick={handleAdd}>
+            {addBusy ? "Saving..." : "Save"}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 text-[11px] rounded-xl" onClick={() => setShowAdd(false)}>Cancel</Button>
+        </div>
+      )}
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
@@ -357,12 +543,13 @@ function IngredientsTab({ isDraft, data }: { isDraft: boolean; data: FormulaIngr
               <TableHead className="w-16 text-[10px] text-center">Phase</TableHead>
               <TableHead className="w-20 text-[10px] text-right">%</TableHead>
               <TableHead className="w-24 text-[10px] text-right">Unit Cost</TableHead>
+              {isDraft && <TableHead className="w-10" />}
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground text-sm">
+                <TableCell colSpan={isDraft ? 8 : 7} className="text-center py-12 text-muted-foreground text-sm">
                   No ingredients recorded for this formula
                 </TableCell>
               </TableRow>
@@ -379,7 +566,7 @@ function IngredientsTab({ isDraft, data }: { isDraft: boolean; data: FormulaIngr
                         className="inline-flex items-center gap-1 text-[11px] font-mono font-medium text-primary hover:underline"
                       >
                         <Package className="h-3 w-3" />
-                        {ing.itemCode ?? ing.stockCardId}
+                        {(ing as FormulaIngredient & { itemCode?: string }).itemCode ?? ing.stockCardId}
                       </Link>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600">
@@ -396,6 +583,18 @@ function IngredientsTab({ isDraft, data }: { isDraft: boolean; data: FormulaIngr
                   </TableCell>
                   <TableCell className="text-right text-[12px] font-medium">{ing.percentage.toFixed(2)}</TableCell>
                   <TableCell className="text-right text-[11px]">{ing.unitCost != null ? `\u0e3f${ing.unitCost.toLocaleString()}` : "--"}</TableCell>
+                  {isDraft && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeleteTarget(ing)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -406,11 +605,34 @@ function IngredientsTab({ isDraft, data }: { isDraft: boolean; data: FormulaIngr
                 <TableCell colSpan={4} className="text-[12px]">Total</TableCell>
                 <TableCell className="text-right text-[12px]">{totalPct.toFixed(2)}%</TableCell>
                 <TableCell />
+                {isDraft && <TableCell />}
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Delete ingredient confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Ingredient</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove <strong>{deleteTarget?.ingredientName}</strong> from this formula? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+              disabled={deleteBusy}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
