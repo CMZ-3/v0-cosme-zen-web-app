@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ClipboardCheck, Plus, Trash2, Play, RotateCcw, PackageCheck, AlertTriangle, TriangleAlert, Loader2 } from "lucide-react"
 import useSWR from "swr"
 import { Button } from "@/components/ui/button"
@@ -32,8 +32,16 @@ export function StockCheckPage() {
   const allFormulas: Formula[] = useMemo(() => formulasData?.formulas ?? [], [formulasData])
   const formulaOptions = allFormulas
 
+  // Once formulas load, backfill the default job that was created before data arrived.
+  useEffect(() => {
+    if (allFormulas.length === 0) return
+    setJobs((prev) =>
+      prev.map((j) => (j.formulaId === "" ? { ...j, formulaId: allFormulas[0].id } : j)),
+    )
+  }, [allFormulas])
+
   function addJob() {
-    setJobs((j) => [...j, newJob()])
+    setJobs((j) => [...j, newJob(allFormulas[0]?.id ?? "")])
   }
   function removeJob(id: string) {
     setJobs((j) => (j.length > 1 ? j.filter((x) => x.id !== id) : j))

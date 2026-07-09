@@ -1,12 +1,15 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
-import { BellRing, TrendingDown, XCircle, ArrowUpCircle, AlertTriangle, Clock, PackageX, CalendarClock, Loader2 } from "lucide-react"
+import { BellRing, TrendingDown, XCircle, ArrowUpCircle, AlertTriangle, Clock, PackageX, CalendarClock, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useStockCards, useStockLots } from "@/lib/hooks/use-stock"
 import { alertTypeLabels, alertTypeColors, type AlertType } from "@/lib/stock-types"
 import { daysUntilExpiry, expiryLevel, type ExpiryLevel } from "@/lib/barcode-utils"
+
+const PAGE_SIZE = 50
 
 const alertIcons: Record<string, typeof AlertTriangle> = {
   low_stock: TrendingDown,
@@ -41,17 +44,26 @@ interface DerivedAlert {
 export function StockAlertsPage() {
   const { cards, isLoading: cardsLoading } = useStockCards()
   const { lots, isLoading: lotsLoading } = useStockLots()
+  const [alertPage, setAlertPage] = useState(0)
 
-  // Derive stock-level alerts directly from live card balances/thresholds.
+  // Derive stock-level alerts from live cards.
+  // Only flag cards that have meaningful thresholds (minStock > 0) OR have had
+  // stock before (initialStock > 0). Pure catalog entries with no thresholds
+  // and zero balance are silently ignored to avoid noise.
   const alerts = useMemo<DerivedAlert[]>(() => {
     const out: DerivedAlert[] = []
     for (const c of cards) {
       if (c.status !== "active") continue
-      if (c.balance <= 0) {
+      // Skip pure catalog placeholders that have never been stocked.
+      const hasThreshold = c.minStock > 0 || c.maxStock > 0 || c.reorderPoint > 0
+      const hasBeenStocked = (c.initialStock ?? 0) > 0 || c.balance > 0
+      if (!hasThreshold && !hasBeenStocked) continue
+
+      if (c.balance <= 0 && hasThreshold) {
         out.push({ id: `a-${c.id}-out`, stockCardId: c.id, itemCode: c.itemCode, itemName: c.itemName, alertType: "out_of_stock", thresholdValue: c.minStock, currentValue: c.balance })
-      } else if (c.balance <= c.minStock) {
+      } else if (c.balance > 0 && c.minStock > 0 && c.balance <= c.minStock) {
         out.push({ id: `a-${c.id}-low`, stockCardId: c.id, itemCode: c.itemCode, itemName: c.itemName, alertType: "low_stock", thresholdValue: c.minStock, currentValue: c.balance })
-      } else if (c.reorderPoint > 0 && c.balance <= c.reorderPoint) {
+      } else if (c.reorderPoint > 0 && c.balance > 0 && c.balance <= c.reorderPoint) {
         out.push({ id: `a-${c.id}-reorder`, stockCardId: c.id, itemCode: c.itemCode, itemName: c.itemName, alertType: "reorder", thresholdValue: c.reorderPoint, currentValue: c.balance })
       } else if (c.maxStock > 0 && c.balance > c.maxStock) {
         out.push({ id: `a-${c.id}-over`, stockCardId: c.id, itemCode: c.itemCode, itemName: c.itemName, alertType: "over_stock", thresholdValue: c.maxStock, currentValue: c.balance })
@@ -61,6 +73,10 @@ export function StockAlertsPage() {
     const rank: Record<string, number> = { out_of_stock: 0, low_stock: 1, reorder: 2, over_stock: 3 }
     return out.sort((a, b) => (rank[a.alertType] ?? 9) - (rank[b.alertType] ?? 9))
   }, [cards])
+
+  // Pagination of the stock-level alert table.
+  const totalAlertPages = Math.max(1, Math.ceil(alerts.length / PAGE_SIZE))
+  const pagedAlerts = alerts.slice(alertPage * PAGE_SIZE, (alertPage + 1) * PAGE_SIZE)
 
   // Expiry watchlist: active lots that are expiring or expired.
   const expiryLots = useMemo(() => {
@@ -160,7 +176,7 @@ export function StockAlertsPage() {
                           <td colSpan={4} className="px-4 py-8 text-center text-xs text-muted-foreground">No active stock-level alerts</td>
                         </tr>
                       ) : (
-                        alerts.map((alert) => {
+                        pagedAlerts.map((alert) => {
                           const Icon = alertIcons[alert.alertType] ?? AlertTriangle
                           return (
                             <tr key={alert.id} className="border-b border-border transition-colors hover:bg-primary/[0.02]">
@@ -192,6 +208,22 @@ export function StockAlertsPage() {
                   </table>
                 </div>
               </div>
+              {totalAlertPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border px-4 py-2">
+                  <span className="text-[11px] text-muted-foreground">
+                    Showing {alertPage * PAGE_SIZE + 1}–{Math.min((alertPage + 1) * PAGE_SIZE, alerts.length)} of {alerts.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={alertPage === 0} onClick={() => setAlertPage((p) => p - 1)}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-[11px] text-muted-foreground">{alertPage + 1} / {totalAlertPages}</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={alertPage >= totalAlertPages - 1} onClick={() => setAlertPage((p) => p + 1)}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* Expiry watchlist */}
