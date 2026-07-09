@@ -14,10 +14,15 @@ import {
   TrendingUp,
   RefreshCw,
 } from "lucide-react"
+// BarChart3, CalendarDays, Clock, TrendingUp still used in pageTabs array
 import { Button } from "@/components/ui/button"
 import { DeliveryKpiCards } from "@/components/delivery/delivery-kpi-cards"
 import { DeliveryTable } from "@/components/delivery/delivery-table"
 import { CreateDeliveryDialog } from "@/components/delivery/create-delivery-dialog"
+import { DeliveryBoard } from "@/components/delivery/delivery-board"
+import { DeliveryCalendar } from "@/components/delivery/delivery-calendar"
+import { DeliveryPendingClose } from "@/components/delivery/delivery-pending-close"
+import { DeliveryAnalytics } from "@/components/delivery/delivery-analytics"
 import type { DeliveryKPISummary } from "@/lib/delivery-types"
 import { cn } from "@/lib/utils"
 
@@ -130,35 +135,19 @@ export default function DeliveryPage() {
       )}
 
       {activeTab === "board" && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-20 mx-8 mt-4">
-          <BarChart3 className="h-10 w-10 text-muted-foreground/30" />
-          <p className="mt-3 text-sm font-bold text-foreground">Kanban Board View</p>
-          <p className="text-[11px] text-muted-foreground">Drag-and-drop delivery status management coming soon</p>
-        </div>
+        <DeliveryBoard orders={orders} onStatusChange={() => mutate()} />
       )}
 
       {activeTab === "calendar" && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-20 mx-8 mt-4">
-          <CalendarDays className="h-10 w-10 text-muted-foreground/30" />
-          <p className="mt-3 text-sm font-bold text-foreground">Delivery Calendar</p>
-          <p className="text-[11px] text-muted-foreground">Calendar view of scheduled deliveries coming soon</p>
-        </div>
+        <DeliveryCalendar orders={orders} />
       )}
 
       {activeTab === "pending" && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-20 mx-8 mt-4">
-          <Clock className="h-10 w-10 text-muted-foreground/30" />
-          <p className="mt-3 text-sm font-bold text-foreground">Pending Job Close</p>
-          <p className="text-[11px] text-muted-foreground">Orders delivered but awaiting job closure</p>
-        </div>
+        <DeliveryPendingClose orders={orders} onRefresh={() => mutate()} />
       )}
 
       {activeTab === "analytics" && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-20 mx-8 mt-4">
-          <TrendingUp className="h-10 w-10 text-muted-foreground/30" />
-          <p className="mt-3 text-sm font-bold text-foreground">Delivery Analytics</p>
-          <p className="text-[11px] text-muted-foreground">Performance metrics, on-time rates & monthly trends coming soon</p>
-        </div>
+        <DeliveryAnalytics orders={orders} />
       )}
 
       <CreateDeliveryDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => mutate()} />

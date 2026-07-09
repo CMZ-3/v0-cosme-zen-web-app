@@ -52,6 +52,8 @@ import { mockLots, mockAudit, mockSpecifications, mockAttributes, mockLotMovemen
 import type { Product, ProductListItem, ProductLot, AuditEntry, LotStatus, QCResult, QualityStatus, ProductSpecification, ProductAttribute, LotMovement, MovementType } from "@/lib/product-types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { ProductEditDialog } from "@/components/products/product-edit-dialog"
+import { CreateJobOrderDialog } from "@/components/job-orders/create-job-order-dialog"
 
 interface ProductDetailDrawerProps {
   open: boolean
@@ -62,7 +64,9 @@ interface ProductDetailDrawerProps {
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDetailDrawerProps) {
-  const { data, isLoading } = useSWR<{ product: ProductListItem }>(
+  const [showEdit, setShowEdit] = useState(false)
+  const [showCreateJO, setShowCreateJO] = useState(false)
+  const { data, isLoading, mutate: mutateProduct } = useSWR<{ product: ProductListItem }>(
     productId ? `/api/products/${productId}` : null,
     fetcher,
     { revalidateOnFocus: false },
@@ -173,16 +177,30 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
 
         {/* Footer Actions */}
         <div className="shrink-0 flex items-center gap-2 border-t border-border px-5 py-3">
-  <Button variant="outline" size="sm" className="gap-1.5 rounded-[10px] text-[11px] font-semibold" onClick={() => toast.success(`Printing ${product.sku}...`)}>
-<Printer className="h-3.5 w-3.5" />
-Print
-</Button>
-<Button size="sm" className="gap-1.5 rounded-[10px] bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-[#3b6fd4]" onClick={() => toast.info(`Editing ${product.nameInternal}`)}>
-<Edit className="h-3.5 w-3.5" />
-Edit Product
-</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 rounded-[10px] text-[11px] font-semibold"
+            onClick={() => window.open(`/barcode?sku=${product.sku}`, "_blank")}
+          >
+            <Printer className="h-3.5 w-3.5" />
+            Print Label
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 rounded-[10px] text-[11px] font-semibold"
+            onClick={() => setShowCreateJO(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Create JO
+          </Button>
           <div className="flex-1" />
-          <Button size="sm" className="gap-1.5 rounded-[10px] bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-[#3b6fd4]">
+          <Button
+            size="sm"
+            className="gap-1.5 rounded-[10px] bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-[#3b6fd4]"
+            onClick={() => setShowEdit(true)}
+          >
             <Edit className="h-3.5 w-3.5" />
             Edit Product
           </Button>
@@ -190,6 +208,19 @@ Edit Product
         </>
         )}
       </SheetContent>
+
+      {/* Dialogs rendered outside SheetContent to avoid z-index issues */}
+      <ProductEditDialog
+        product={product ?? null}
+        open={showEdit}
+        onOpenChange={setShowEdit}
+        onSaved={() => mutateProduct()}
+      />
+      <CreateJobOrderDialog
+        open={showCreateJO}
+        onOpenChange={setShowCreateJO}
+        onCreated={() => toast.success("สร้าง Job Order แล้ว")}
+      />
     </Sheet>
   )
 }
