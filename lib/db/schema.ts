@@ -384,13 +384,156 @@ export const dailyProductionRecords = pgTable("daily_production_records", {
   createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
 })
 
+// ============================================================
+// FDA sub-tables (PIF data)
+// ============================================================
+export const fdaIngredients = pgTable("fda_ingredients", {
+  id: text("id").primaryKey(),
+  registrationId: text("registrationId").notNull(),
+  ingredientName: text("ingredientName").notNull(),
+  inciName: text("inciName"),
+  thaiName: text("thaiName"),
+  casNumber: text("casNumber"),
+  percentage: doublePrecision("percentage"),
+  percentageMin: doublePrecision("percentageMin"),
+  percentageMax: doublePrecision("percentageMax"),
+  function: text("function"),
+  origin: text("origin"),
+  supplier: text("supplier"),
+  isRestricted: boolean("isRestricted").notNull().default(false),
+  maxAllowedPercentage: doublePrecision("maxAllowedPercentage"),
+  restrictions: text("restrictions"),
+  restrictionNotes: text("restrictionNotes"),
+  sortOrder: integer("sortOrder").notNull().default(0),
+})
+
+export const fdaManufacturingSteps = pgTable("fda_manufacturing_steps", {
+  id: text("id").primaryKey(),
+  registrationId: text("registrationId").notNull(),
+  stepNumber: integer("stepNumber").notNull(),
+  stepName: text("stepName").notNull(),
+  description: text("description"),
+  equipment: text("equipment"),
+  temperatureRange: text("temperatureRange"),
+  timeDuration: text("timeDuration"),
+  criticalParameters: text("criticalParameters"),
+  qualityChecks: text("qualityChecks"),
+})
+
+export const fdaRawMaterialSpecs = pgTable("fda_raw_material_specs", {
+  id: text("id").primaryKey(),
+  registrationId: text("registrationId").notNull(),
+  materialName: text("materialName").notNull(),
+  grade: text("grade"),
+  supplier: text("supplier"),
+  standardRef: text("standardRef"),
+  appearanceSpec: text("appearanceSpec"),
+  phSpec: text("phSpec"),
+  assaySpec: text("assaySpec"),
+  microSpec: text("microSpec"),
+  sortOrder: integer("sortOrder").notNull().default(0),
+})
+
+export const fdaDocuments = pgTable("fda_documents", {
+  id: text("id").primaryKey(),
+  registrationId: text("registrationId").notNull(),
+  documentType: text("documentType").notNull(),
+  documentName: text("documentName").notNull(),
+  fileName: text("fileName"),
+  fileUrl: text("fileUrl"),
+  fileSize: integer("fileSize"),
+  uploadedAt: text("uploadedAt"),
+  notes: text("notes"),
+  sortOrder: integer("sortOrder").notNull().default(0),
+})
+
+export const fdaChecklist = pgTable("fda_checklist", {
+  id: text("id").primaryKey(),
+  registrationId: text("registrationId").notNull(),
+  category: text("category").notNull(),
+  item: text("item").notNull(),
+  isRequired: boolean("isRequired").notNull().default(true),
+  isCompleted: boolean("isCompleted").notNull().default(false),
+  notes: text("notes"),
+  sortOrder: integer("sortOrder").notNull().default(0),
+})
+
+export const fdaAuditLogs = pgTable("fda_audit_logs", {
+  id: text("id").primaryKey(),
+  registrationId: text("registrationId").notNull(),
+  action: text("action").notNull(),
+  performedBy: text("performedBy").notNull().default("system"),
+  note: text("note"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
+// ============================================================
+// Formula sub-tables (phases, steps, qc specs, versions)
+// ============================================================
+export const formulaPhases = pgTable("formula_phases", {
+  id: text("id").primaryKey(),
+  formulaId: text("formulaId").notNull(),
+  phaseKey: text("phaseKey").notNull(), // A, B, C, D
+  phaseName: text("phaseName").notNull(),
+  sortOrder: integer("sortOrder").notNull().default(0),
+})
+
+export const formulaProcessingSteps = pgTable("formula_processing_steps", {
+  id: text("id").primaryKey(),
+  formulaId: text("formulaId").notNull(),
+  phase: text("phase").notNull(), // A, B, C, D — links to formulaPhases.phaseKey
+  stepNumber: integer("stepNumber").notNull(),
+  instruction: text("instruction").notNull(),
+  temperatureMin: doublePrecision("temperatureMin"),
+  temperatureMax: doublePrecision("temperatureMax"),
+  durationMinutes: integer("durationMinutes"),
+  speedRpm: integer("speedRpm"),
+  equipment: text("equipment"),
+  notes: text("notes"),
+})
+
+export const formulaQcSpecs = pgTable("formula_qc_specs", {
+  id: text("id").primaryKey(),
+  formulaId: text("formulaId").notNull(),
+  parameterName: text("parameterName").notNull(),
+  unit: text("unit"),
+  targetValue: text("targetValue"),
+  minValue: doublePrecision("minValue"),
+  maxValue: doublePrecision("maxValue"),
+  testMethod: text("testMethod"),
+  notes: text("notes"),
+  sortOrder: integer("sortOrder").notNull().default(0),
+})
+
+export const formulaVersions = pgTable("formula_versions", {
+  id: text("id").primaryKey(),
+  formulaId: text("formulaId").notNull(),
+  versionNumber: integer("versionNumber").notNull(),
+  changeDescription: text("changeDescription"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  createdBy: text("createdBy"),
+})
+
+// ============================================================
+// Type exports
+// ============================================================
 export type CustomerRow = typeof customers.$inferSelect
 export type SupplierRow = typeof suppliers.$inferSelect
 export type FdaRegistrationRow = typeof fdaRegistrations.$inferSelect
+export type FdaIngredientRow = typeof fdaIngredients.$inferSelect
+export type FdaManufacturingStepRow = typeof fdaManufacturingSteps.$inferSelect
+export type FdaRawMaterialSpecRow = typeof fdaRawMaterialSpecs.$inferSelect
+export type FdaDocumentRow = typeof fdaDocuments.$inferSelect
+export type FdaChecklistRow = typeof fdaChecklist.$inferSelect
+export type FdaAuditLogRow = typeof fdaAuditLogs.$inferSelect
 export type ProductRow = typeof products.$inferSelect
 
 export type FormulaRow = typeof formulas.$inferSelect
 export type FormulaIngredientRow = typeof formulaIngredients.$inferSelect
+export type FormulaPhaseRow = typeof formulaPhases.$inferSelect
+export type FormulaProcessingStepRow = typeof formulaProcessingSteps.$inferSelect
+export type FormulaQcSpecRow = typeof formulaQcSpecs.$inferSelect
+export type FormulaVersionRow = typeof formulaVersions.$inferSelect
 export type JobOrderRow = typeof jobOrders.$inferSelect
 export type ProductionStepRow = typeof productionSteps.$inferSelect
 export type DailyProductionRecordRow = typeof dailyProductionRecords.$inferSelect

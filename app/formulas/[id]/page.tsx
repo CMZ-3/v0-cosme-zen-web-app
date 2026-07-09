@@ -15,12 +15,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  mockFormulaPhases, mockFormulaSteps,
-  mockFormulaQcSpecs, mockFormulaVersions, mockFormulaCostHistory, mockFormulaDocuments,
-  mockTrialBatches, mockApprovalSteps, mockStabilityTests,
-} from "@/lib/formula-mock-data"
-import type { Formula, FormulaIngredient } from "@/lib/formula-types"
+import type {
+  Formula, FormulaIngredient, FormulaPhase, FormulaProcessingStep,
+  FormulaQcSpec, FormulaVersion,
+} from "@/lib/formula-types"
 import { formulaStatusLabel, formulaStatusColor, formulaTypeLabel, phaseBadgeColor } from "@/lib/formula-types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
@@ -30,6 +28,10 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 interface FormulaDetailResponse {
   formula: Formula
   ingredients: FormulaIngredient[]
+  phases: FormulaPhase[]
+  steps: FormulaProcessingStep[]
+  qcSpecs: FormulaQcSpec[]
+  versions: FormulaVersion[]
 }
 
 export default function FormulaDetailPage() {
@@ -42,6 +44,10 @@ export default function FormulaDetailPage() {
   )
   const formula = data?.formula
   const ingredients = data?.ingredients ?? []
+  const phases = data?.phases ?? []
+  const steps = data?.steps ?? []
+  const qcSpecs = data?.qcSpecs ?? []
+  const versions = data?.versions ?? []
 
   if (isLoading) {
     return (
@@ -178,12 +184,12 @@ export default function FormulaDetailPage() {
 
           {/* ===== PHASES & STEPS ===== */}
           <TabsContent value="phases" className="m-0 p-6">
-            <PhasesTab isDraft={isDraft} />
+            <PhasesTab isDraft={isDraft} phases={phases} steps={steps} />
           </TabsContent>
 
           {/* ===== QC SPECS ===== */}
           <TabsContent value="qc" className="m-0 p-6">
-            <QcSpecsTab isDraft={isDraft} />
+            <QcSpecsTab isDraft={isDraft} qcSpecs={qcSpecs} />
           </TabsContent>
 
           {/* ===== STABILITY ===== */}
@@ -198,7 +204,7 @@ export default function FormulaDetailPage() {
 
           {/* ===== VERSIONS ===== */}
           <TabsContent value="versions" className="m-0 p-6">
-            <VersionsTab />
+            <VersionsTab versions={versions} />
           </TabsContent>
 
           {/* ===== COST ===== */}
@@ -412,22 +418,28 @@ function IngredientsTab({ isDraft, data }: { isDraft: boolean; data: FormulaIngr
 /* ============================================================================
    PHASES & STEPS TAB
    ============================================================================ */
-function PhasesTab({ isDraft }: { isDraft: boolean }) {
-  const [expandedPhase, setExpandedPhase] = useState<string | null>(mockFormulaPhases[0]?.id ?? null)
+function PhasesTab({ isDraft, phases, steps: allSteps }: { isDraft: boolean; phases: FormulaPhase[]; steps: FormulaProcessingStep[] }) {
+  const [expandedPhase, setExpandedPhase] = useState<string | null>(phases[0]?.id ?? null)
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-[14px] font-bold">Phases ({mockFormulaPhases.length})</h3>
+        <h3 className="text-[14px] font-bold">Phases ({phases.length})</h3>
         {isDraft && (
           <Button size="sm" variant="outline" className="h-8 text-[11px] rounded-xl gap-1.5"><Plus className="h-3.5 w-3.5" /> Add Phase</Button>
         )}
       </div>
 
+      {phases.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground text-sm">
+          ยังไม่มีข้อมูล phases สำหรับสูตรนี้
+        </div>
+      )}
+
       <div className="space-y-3">
-        {mockFormulaPhases.map((phase) => {
+        {phases.map((phase) => {
           const isExpanded = expandedPhase === phase.id
-          const steps = mockFormulaSteps.filter((s) => s.phase === phase.phaseKey)
+          const steps = allSteps.filter((s) => s.phase === phase.phaseKey)
 
           return (
             <div key={phase.id} className="rounded-xl border border-border bg-card overflow-hidden">
@@ -493,11 +505,11 @@ function PhasesTab({ isDraft }: { isDraft: boolean }) {
 /* ============================================================================
    QC SPECS TAB
    ============================================================================ */
-function QcSpecsTab({ isDraft }: { isDraft: boolean }) {
+function QcSpecsTab({ isDraft, qcSpecs }: { isDraft: boolean; qcSpecs: FormulaQcSpec[] }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-[14px] font-bold">QC Specifications ({mockFormulaQcSpecs.length})</h3>
+        <h3 className="text-[14px] font-bold">QC Specifications ({qcSpecs.length})</h3>
         {isDraft && (
           <Button size="sm" variant="outline" className="h-8 text-[11px] rounded-xl gap-1.5"><Plus className="h-3.5 w-3.5" /> Add Spec</Button>
         )}
@@ -517,21 +529,29 @@ function QcSpecsTab({ isDraft }: { isDraft: boolean }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockFormulaQcSpecs.map((spec) => (
-              <TableRow key={spec.id} className="hover:bg-muted/20">
-                <TableCell className="text-[12px] font-semibold">{spec.parameterName}</TableCell>
-                <TableCell className="text-[11px] text-muted-foreground">{spec.unit ?? "--"}</TableCell>
-                <TableCell className="text-right text-[12px]">{spec.minValue != null ? spec.minValue : "--"}</TableCell>
-                <TableCell className="text-center">
-                  <span className="inline-flex px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[11px] font-semibold">
-                    {spec.targetValue ?? "--"}
-                  </span>
+            {qcSpecs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-10 text-muted-foreground text-sm">
+                  ยังไม่มี QC specifications
                 </TableCell>
-                <TableCell className="text-right text-[12px]">{spec.maxValue != null ? spec.maxValue : "--"}</TableCell>
-                <TableCell className="text-[11px] text-muted-foreground">{spec.testMethod ?? "--"}</TableCell>
-                <TableCell className="text-[11px] text-muted-foreground">{spec.notes ?? "--"}</TableCell>
               </TableRow>
-            ))}
+            ) : (
+              qcSpecs.map((spec) => (
+                <TableRow key={spec.id} className="hover:bg-muted/20">
+                  <TableCell className="text-[12px] font-semibold">{spec.parameterName}</TableCell>
+                  <TableCell className="text-[11px] text-muted-foreground">{spec.unit ?? "--"}</TableCell>
+                  <TableCell className="text-right text-[12px]">{spec.minValue != null ? spec.minValue : "--"}</TableCell>
+                  <TableCell className="text-center">
+                    <span className="inline-flex px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[11px] font-semibold">
+                      {spec.targetValue ?? "--"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right text-[12px]">{spec.maxValue != null ? spec.maxValue : "--"}</TableCell>
+                  <TableCell className="text-[11px] text-muted-foreground">{spec.testMethod ?? "--"}</TableCell>
+                  <TableCell className="text-[11px] text-muted-foreground">{spec.notes ?? "--"}</TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
@@ -542,16 +562,25 @@ function QcSpecsTab({ isDraft }: { isDraft: boolean }) {
 /* ============================================================================
    VERSIONS TAB
    ============================================================================ */
-function VersionsTab() {
+function VersionsTab({ versions }: { versions: FormulaVersion[] }) {
+  // Show latest version first (highest versionNumber = current)
+  const sorted = [...versions].sort((a, b) => b.versionNumber - a.versionNumber)
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-[14px] font-bold">Version History ({mockFormulaVersions.length})</h3>
+        <h3 className="text-[14px] font-bold">Version History ({versions.length})</h3>
         <Button size="sm" variant="outline" className="h-8 text-[11px] rounded-xl gap-1.5"><Plus className="h-3.5 w-3.5" /> Create Version</Button>
       </div>
 
+      {versions.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground text-sm">
+          ยังไม่มีประวัติ version
+        </div>
+      )}
+
       <div className="space-y-3">
-        {mockFormulaVersions.map((ver, idx) => (
+        {sorted.map((ver, idx) => (
           <div key={ver.id} className={cn("rounded-xl border bg-card p-4 flex items-start gap-4", idx === 0 ? "border-primary/40 bg-primary/5" : "border-border")}>
             <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl text-[14px] font-extrabold shrink-0", idx === 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}>
               v{ver.versionNumber}
@@ -562,7 +591,9 @@ function VersionsTab() {
                 {idx === 0 && <Badge className="text-[9px] h-4 bg-primary text-primary-foreground">Current</Badge>}
               </div>
               <p className="text-[12px] text-muted-foreground mt-0.5">{ver.changeDescription ?? "No description"}</p>
-              <p className="text-[10px] text-muted-foreground mt-1">Created {ver.createdAt} by {ver.createdBy ?? "Unknown"}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Created {new Date(ver.createdAt).toLocaleDateString("th-TH")} by {ver.createdBy ?? "Unknown"}
+              </p>
             </div>
             <Button variant="ghost" size="sm" className="h-7 text-[11px] rounded-lg gap-1 text-muted-foreground shrink-0">
               <Eye className="h-3.5 w-3.5" /> Snapshot
@@ -623,18 +654,11 @@ function CostTab({ formula }: { formula: Formula }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockFormulaCostHistory.map((ch) => (
-              <TableRow key={ch.id} className="hover:bg-muted/10">
-                <TableCell className="text-[12px]">{ch.recordedAt}</TableCell>
-                <TableCell className="text-right text-[12px] font-medium">{"\u0e3f"}{ch.totalCost.toLocaleString()}</TableCell>
-                <TableCell className="text-right text-[12px]">{"\u0e3f"}{ch.costPerUnit.toLocaleString()}</TableCell>
-                <TableCell className="text-right text-[12px]">{ch.batchSize} kg</TableCell>
-                <TableCell className="text-center text-[12px]">{ch.ingredientCount}</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="text-[10px]">{ch.triggeredBy ?? "auto"}</Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+            <TableRow>
+              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
+                ยังไม่มีประวัติการคำนวณต้นทุน
+              </TableCell>
+            </TableRow>
           </TableBody>
         </Table>
       </div>
@@ -646,49 +670,15 @@ function CostTab({ formula }: { formula: Formula }) {
    DOCUMENTS TAB
    ============================================================================ */
 function DocumentsTab() {
-  const formatSize = (bytes?: number | null) => {
-    if (!bytes) return "--"
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / 1048576).toFixed(1)} MB`
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-[14px] font-bold">Documents ({mockFormulaDocuments.length})</h3>
+        <h3 className="text-[14px] font-bold">Documents</h3>
         <Button size="sm" variant="outline" className="h-8 text-[11px] rounded-xl gap-1.5"><Plus className="h-3.5 w-3.5" /> Upload</Button>
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/30">
-              <TableHead className="text-[10px]">Title</TableHead>
-              <TableHead className="text-[10px]">Type</TableHead>
-              <TableHead className="text-[10px]">File</TableHead>
-              <TableHead className="text-[10px] text-right">Size</TableHead>
-              <TableHead className="text-[10px]">Uploaded</TableHead>
-              <TableHead className="text-[10px]">By</TableHead>
-              <TableHead className="w-16" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {mockFormulaDocuments.map((doc) => (
-              <TableRow key={doc.id} className="hover:bg-muted/20">
-                <TableCell className="text-[12px] font-semibold">{doc.title ?? doc.fileName}</TableCell>
-                <TableCell><Badge variant="outline" className="text-[10px]">{doc.documentType ?? "Other"}</Badge></TableCell>
-                <TableCell className="text-[11px] text-muted-foreground">{doc.fileName}</TableCell>
-                <TableCell className="text-right text-[11px]">{formatSize(doc.fileSize)}</TableCell>
-                <TableCell className="text-[11px] text-muted-foreground">{doc.createdAt}</TableCell>
-                <TableCell className="text-[11px]">{doc.createdBy ?? "--"}</TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0"><Download className="h-3.5 w-3.5" /></Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground text-sm">
+        ยังไม่มีเอกสารสำหรับสูตรนี้ — ฟีเจอร์อัพโหลดไฟล์จะพร้อมในเร็วๆ นี้
       </div>
     </div>
   )
@@ -703,103 +693,27 @@ function ExtendedTab() {
       {/* Trial Batches */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-bold">Trial Batches ({mockTrialBatches.length})</h3>
+          <h3 className="text-[14px] font-bold">Trial Batches</h3>
           <Button size="sm" variant="outline" className="h-8 text-[11px] rounded-xl gap-1.5"><Plus className="h-3.5 w-3.5" /> Add Trial</Button>
         </div>
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="text-[10px]">Trial Code</TableHead>
-                <TableHead className="text-[10px] text-right">Batch Size</TableHead>
-                <TableHead className="text-[10px]">Date</TableHead>
-                <TableHead className="text-[10px]">Operator</TableHead>
-                <TableHead className="text-[10px]">Results</TableHead>
-                <TableHead className="text-[10px]">Feedback</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockTrialBatches.map((tb) => (
-                <TableRow key={tb.id} className="hover:bg-muted/20">
-                  <TableCell className="text-[12px] font-semibold text-primary">{tb.trialCode}</TableCell>
-                  <TableCell className="text-right text-[12px]">{tb.batchSize != null ? `${tb.batchSize} kg` : "--"}</TableCell>
-                  <TableCell className="text-[11px]">{tb.productionDate ?? "--"}</TableCell>
-                  <TableCell className="text-[11px]">{tb.operator ?? "--"}</TableCell>
-                  <TableCell className="text-[11px] max-w-[200px] truncate">{tb.results ?? "--"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn("text-[10px]",
-                      tb.feedbackStatus === "approved" ? "border-emerald-200 text-emerald-600" :
-                      tb.feedbackStatus === "revision" ? "border-amber-200 text-amber-600" : ""
-                    )}>
-                      {tb.feedbackStatus ?? "Pending"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-muted-foreground text-sm">
+          ยังไม่มีข้อมูล trial batches — ฟีเจอร์นี้จะพร้อมในเร็วๆ นี้
         </div>
       </div>
 
       {/* Approval Steps */}
       <div className="space-y-3">
-        <h3 className="text-[14px] font-bold">Approval Steps ({mockApprovalSteps.length})</h3>
-        <div className="grid grid-cols-4 gap-3">
-          {mockApprovalSteps.map((step) => (
-            <div key={step.id} className={cn("rounded-xl border p-4", step.status === "approved" ? "border-emerald-200 bg-emerald-50/50" : "border-border bg-card")}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-bold">{step.stepNumber}</span>
-                <div>
-                  <p className="text-[12px] font-bold leading-tight">{step.stepName}</p>
-                  {step.stepSubtitle && <p className="text-[10px] text-muted-foreground">{step.stepSubtitle}</p>}
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[11px]"><span className="text-muted-foreground">Approver:</span> {step.approver ?? "--"}</p>
-                <p className="text-[11px]"><span className="text-muted-foreground">Date:</span> {step.approvalDate ?? "--"}</p>
-                {step.status && (
-                  <Badge variant="outline" className={cn("text-[9px] mt-1", step.status === "approved" ? "border-emerald-200 text-emerald-600" : "border-border text-muted-foreground")}>
-                    {step.status}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          ))}
+        <h3 className="text-[14px] font-bold">Approval Steps</h3>
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-muted-foreground text-sm">
+          ยังไม่มีข้อมูล approval steps
         </div>
       </div>
 
       {/* Stability Tests */}
       <div className="space-y-3">
-        <h3 className="text-[14px] font-bold">Stability Tests ({mockStabilityTests.length})</h3>
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="text-[10px]">Test Type</TableHead>
-                <TableHead className="text-[10px]">Parameter</TableHead>
-                <TableHead className="text-[10px]">Method</TableHead>
-                <TableHead className="text-[10px]">Duration</TableHead>
-                <TableHead className="text-[10px]">Result</TableHead>
-                <TableHead className="text-[10px]">Notes</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockStabilityTests.map((st) => (
-                <TableRow key={st.id} className="hover:bg-muted/20">
-                  <TableCell className="text-[12px] font-semibold">{st.testType}</TableCell>
-                  <TableCell className="text-[11px]">{st.parameter ?? "--"}</TableCell>
-                  <TableCell className="text-[11px] text-muted-foreground">{st.method ?? "--"}</TableCell>
-                  <TableCell className="text-[11px]">{st.duration ?? "--"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn("text-[10px]", st.result === "Pass" ? "border-emerald-200 text-emerald-600" : "border-red-200 text-red-600")}>
-                      {st.result ?? "--"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-[11px] text-muted-foreground">{st.notes ?? "--"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <h3 className="text-[14px] font-bold">Stability Tests</h3>
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-muted-foreground text-sm">
+          ยังไม่มีข้อมูล stability tests
         </div>
       </div>
     </div>
@@ -889,38 +803,11 @@ function StabilityTab() {
         </div>
       </div>
 
-      {/* Results Table from mockStabilityTests */}
+      {/* Detailed Results — placeholder until stability_tests table is added */}
       <div className="space-y-3">
         <h3 className="text-[14px] font-bold text-foreground">Detailed Results</h3>
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="text-[10px]">Test Type</TableHead>
-                <TableHead className="text-[10px]">Parameter</TableHead>
-                <TableHead className="text-[10px]">Method</TableHead>
-                <TableHead className="text-[10px]">Duration</TableHead>
-                <TableHead className="text-[10px]">Result</TableHead>
-                <TableHead className="text-[10px]">Notes</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockStabilityTests.map((st) => (
-                <TableRow key={st.id} className="hover:bg-muted/20">
-                  <TableCell className="text-[12px] font-semibold">{st.testType}</TableCell>
-                  <TableCell className="text-[11px]">{st.parameter ?? "--"}</TableCell>
-                  <TableCell className="text-[11px] text-muted-foreground">{st.method ?? "--"}</TableCell>
-                  <TableCell className="text-[11px]">{st.duration ?? "--"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn("text-[10px]", st.result === "Pass" ? "border-emerald-200 text-emerald-600" : "border-red-200 text-red-600")}>
-                      {st.result ?? "--"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-[11px] text-muted-foreground">{st.notes ?? "--"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-muted-foreground text-sm">
+          ยังไม่มีข้อมูล detailed stability results
         </div>
       </div>
     </div>

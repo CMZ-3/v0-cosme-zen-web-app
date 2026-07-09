@@ -3,9 +3,15 @@
  * the `Formula` and `FormulaIngredient` types used by the existing UI components.
  */
 import { db } from "@/lib/db"
-import { formulas, formulaIngredients, stockCards } from "@/lib/db/schema"
-import { sql, eq, count } from "drizzle-orm"
-import type { Formula, FormulaIngredient, FormulaKPISummary } from "@/lib/formula-types"
+import {
+  formulas, formulaIngredients, stockCards,
+  formulaPhases, formulaProcessingSteps, formulaQcSpecs, formulaVersions,
+} from "@/lib/db/schema"
+import { sql, eq, count, asc } from "drizzle-orm"
+import type {
+  Formula, FormulaIngredient, FormulaKPISummary,
+  FormulaPhase, FormulaProcessingStep, FormulaQcSpec, FormulaVersion,
+} from "@/lib/formula-types"
 
 // ---------------------------------------------------------------------------
 // Mappers
@@ -178,4 +184,72 @@ export async function createFormula(input: {
 
   const created = await getFormulaById(id)
   return created!
+}
+
+// ---------------------------------------------------------------------------
+// Formula sub-table queries (phases, steps, qc specs, versions)
+// ---------------------------------------------------------------------------
+
+export async function getFormulaPhases(formulaId: string): Promise<FormulaPhase[]> {
+  const rows = await db.select().from(formulaPhases)
+    .where(eq(formulaPhases.formulaId, formulaId))
+    .orderBy(asc(formulaPhases.sortOrder))
+  return rows.map((r) => ({
+    id: r.id,
+    formulaId: r.formulaId,
+    phaseKey: r.phaseKey,
+    phaseName: r.phaseName,
+    sortOrder: r.sortOrder,
+  }))
+}
+
+export async function getFormulaProcessingSteps(formulaId: string): Promise<FormulaProcessingStep[]> {
+  const rows = await db.select().from(formulaProcessingSteps)
+    .where(eq(formulaProcessingSteps.formulaId, formulaId))
+    .orderBy(asc(formulaProcessingSteps.phase), asc(formulaProcessingSteps.stepNumber))
+  return rows.map((r) => ({
+    id: r.id,
+    formulaId: r.formulaId,
+    phase: r.phase,
+    stepNumber: r.stepNumber,
+    instruction: r.instruction,
+    temperatureMin: r.temperatureMin ?? null,
+    temperatureMax: r.temperatureMax ?? null,
+    durationMinutes: r.durationMinutes ?? null,
+    speedRpm: r.speedRpm ?? null,
+    equipment: r.equipment ?? null,
+    notes: r.notes ?? null,
+  }))
+}
+
+export async function getFormulaQcSpecs(formulaId: string): Promise<FormulaQcSpec[]> {
+  const rows = await db.select().from(formulaQcSpecs)
+    .where(eq(formulaQcSpecs.formulaId, formulaId))
+    .orderBy(asc(formulaQcSpecs.sortOrder))
+  return rows.map((r) => ({
+    id: r.id,
+    formulaId: r.formulaId,
+    parameterName: r.parameterName,
+    unit: r.unit ?? null,
+    targetValue: r.targetValue ?? null,
+    minValue: r.minValue ?? null,
+    maxValue: r.maxValue ?? null,
+    testMethod: r.testMethod ?? null,
+    notes: r.notes ?? null,
+    sortOrder: r.sortOrder,
+  }))
+}
+
+export async function getFormulaVersions(formulaId: string): Promise<FormulaVersion[]> {
+  const rows = await db.select().from(formulaVersions)
+    .where(eq(formulaVersions.formulaId, formulaId))
+    .orderBy(asc(formulaVersions.versionNumber))
+  return rows.map((r) => ({
+    id: r.id,
+    formulaId: r.formulaId,
+    versionNumber: r.versionNumber,
+    changeDescription: r.changeDescription ?? null,
+    createdAt: r.createdAt.toISOString(),
+    createdBy: r.createdBy ?? null,
+  }))
 }

@@ -1,14 +1,26 @@
 "use client"
 
-import { use, useMemo } from "react"
-import { mockDeliveryOrders, mockDeliveryLines } from "@/lib/delivery-mock-data"
-import type { DeliveryOrderLine } from "@/lib/delivery-types"
+import { use } from "react"
+import useSWR from "swr"
+import type { DeliveryOrder, DeliveryOrderLine } from "@/lib/delivery-types"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 export default function PrintDeliveryOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
 
-  const order = useMemo(() => mockDeliveryOrders.find((o) => o.id === id), [id])
-  const lines: DeliveryOrderLine[] = mockDeliveryLines.filter((l) => l.deliveryOrderId === id)
+  const { data, isLoading } = useSWR<{ order: DeliveryOrder }>(`/api/delivery-orders/${id}`, fetcher)
+  const order = data?.order
+  // delivery_lines table not yet created — show order summary row as fallback
+  const lines: DeliveryOrderLine[] = []
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#525659]">
+        <p className="text-white text-sm font-medium">กำลังโหลด...</p>
+      </div>
+    )
+  }
 
   if (!order) {
     return (
@@ -376,7 +388,7 @@ export default function PrintDeliveryOrderPage({ params }: { params: Promise<{ i
                 borderBottom: "1px dotted #94a3b8",
               }} />
               <div style={{ position: "absolute", bottom: 10, left: 15, fontSize: 11, color: "#64748b" }}>
-                {"วันที่: _____/_____/_____"}
+                {"วัน��ี่: _____/_____/_____"}
               </div>
             </div>
 

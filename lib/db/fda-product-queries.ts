@@ -1,8 +1,18 @@
 import { db } from "@/lib/db"
-import { fdaRegistrations, products } from "@/lib/db/schema"
-import { eq, desc, ilike, or } from "drizzle-orm"
-import type { FdaRegistrationRow, ProductRow } from "@/lib/db/schema"
-import type { FdaListItem, FdaKPISummary, RegistrationType, FdaStatus } from "@/lib/fda-types"
+import {
+  fdaRegistrations, products,
+  fdaIngredients, fdaManufacturingSteps, fdaRawMaterialSpecs, fdaDocuments, fdaChecklist, fdaAuditLogs,
+} from "@/lib/db/schema"
+import { eq, desc, ilike, or, asc } from "drizzle-orm"
+import type {
+  FdaRegistrationRow, ProductRow,
+  FdaIngredientRow, FdaManufacturingStepRow, FdaRawMaterialSpecRow,
+  FdaDocumentRow, FdaChecklistRow, FdaAuditLogRow,
+} from "@/lib/db/schema"
+import type {
+  FdaListItem, FdaKPISummary, RegistrationType, FdaStatus,
+  FdaIngredient, FdaManufacturingStep, FdaRawMaterialSpec, FdaDocument, FdaChecklistItem, FdaAuditLog,
+} from "@/lib/fda-types"
 import type { ProductListItem, ProductKPISummary, ProductCategory, ProductStatus, FDAStatus, ContainerType } from "@/lib/product-types"
 
 // ─── FDA Registrations ────────────────────────────────────────────────────
@@ -78,6 +88,118 @@ export async function createFdaRegistration(
 ): Promise<FdaRegistrationRow> {
   const rows = await db.insert(fdaRegistrations).values(data).returning()
   return rows[0]
+}
+
+// ─── FDA detail: sub-tables ───────────────────────────────────────────────
+
+export async function getFdaIngredients(registrationId: string): Promise<FdaIngredient[]> {
+  const rows = await db.select().from(fdaIngredients)
+    .where(eq(fdaIngredients.registrationId, registrationId))
+    .orderBy(asc(fdaIngredients.sortOrder))
+  return rows.map((r: FdaIngredientRow) => ({
+    id: r.id,
+    registrationId: r.registrationId,
+    ingredientName: r.ingredientName,
+    inciName: r.inciName ?? undefined,
+    thaiName: r.thaiName ?? undefined,
+    casNumber: r.casNumber ?? undefined,
+    percentage: r.percentage ?? undefined,
+    percentageMin: r.percentageMin ?? undefined,
+    percentageMax: r.percentageMax ?? undefined,
+    function: r.function ?? undefined,
+    origin: r.origin ?? undefined,
+    supplier: r.supplier ?? undefined,
+    isRestricted: r.isRestricted,
+    maxAllowedPercentage: r.maxAllowedPercentage ?? undefined,
+    restrictions: r.restrictions ?? undefined,
+    restrictionNotes: r.restrictionNotes ?? undefined,
+    sortOrder: r.sortOrder,
+  }))
+}
+
+export async function getFdaManufacturingSteps(registrationId: string): Promise<FdaManufacturingStep[]> {
+  const rows = await db.select().from(fdaManufacturingSteps)
+    .where(eq(fdaManufacturingSteps.registrationId, registrationId))
+    .orderBy(asc(fdaManufacturingSteps.stepNumber))
+  return rows.map((r: FdaManufacturingStepRow) => ({
+    id: r.id,
+    registrationId: r.registrationId,
+    stepNumber: r.stepNumber,
+    stepName: r.stepName,
+    description: r.description ?? undefined,
+    equipment: r.equipment ?? undefined,
+    temperatureRange: r.temperatureRange ?? undefined,
+    timeDuration: r.timeDuration ?? undefined,
+    criticalParameters: r.criticalParameters ?? undefined,
+    qualityChecks: r.qualityChecks ?? undefined,
+  }))
+}
+
+export async function getFdaRawMaterialSpecs(registrationId: string): Promise<FdaRawMaterialSpec[]> {
+  const rows = await db.select().from(fdaRawMaterialSpecs)
+    .where(eq(fdaRawMaterialSpecs.registrationId, registrationId))
+    .orderBy(asc(fdaRawMaterialSpecs.sortOrder))
+  return rows.map((r: FdaRawMaterialSpecRow) => ({
+    id: r.id,
+    registrationId: r.registrationId,
+    materialName: r.materialName,
+    grade: r.grade ?? undefined,
+    supplier: r.supplier ?? undefined,
+    standardRef: r.standardRef ?? undefined,
+    appearanceSpec: r.appearanceSpec ?? undefined,
+    phSpec: r.phSpec ?? undefined,
+    assaySpec: r.assaySpec ?? undefined,
+    microSpec: r.microSpec ?? undefined,
+    sortOrder: r.sortOrder,
+  }))
+}
+
+export async function getFdaDocuments(registrationId: string): Promise<FdaDocument[]> {
+  const rows = await db.select().from(fdaDocuments)
+    .where(eq(fdaDocuments.registrationId, registrationId))
+    .orderBy(asc(fdaDocuments.sortOrder))
+  return rows.map((r: FdaDocumentRow) => ({
+    id: r.id,
+    registrationId: r.registrationId,
+    documentType: r.documentType as FdaDocument["documentType"],
+    documentName: r.documentName,
+    fileName: r.fileName ?? undefined,
+    fileUrl: r.fileUrl ?? undefined,
+    fileSize: r.fileSize ?? undefined,
+    uploadedAt: r.uploadedAt ?? undefined,
+    notes: r.notes ?? undefined,
+    sortOrder: r.sortOrder,
+  }))
+}
+
+export async function getFdaChecklist(registrationId: string): Promise<FdaChecklistItem[]> {
+  const rows = await db.select().from(fdaChecklist)
+    .where(eq(fdaChecklist.registrationId, registrationId))
+    .orderBy(asc(fdaChecklist.sortOrder))
+  return rows.map((r: FdaChecklistRow) => ({
+    id: r.id,
+    registrationId: r.registrationId,
+    category: r.category,
+    item: r.item,
+    isRequired: r.isRequired,
+    isCompleted: r.isCompleted,
+    notes: r.notes ?? undefined,
+    sortOrder: r.sortOrder,
+  }))
+}
+
+export async function getFdaAuditLogs(registrationId: string): Promise<FdaAuditLog[]> {
+  const rows = await db.select().from(fdaAuditLogs)
+    .where(eq(fdaAuditLogs.registrationId, registrationId))
+    .orderBy(desc(fdaAuditLogs.createdAt))
+  return rows.map((r: FdaAuditLogRow) => ({
+    id: r.id,
+    registrationId: r.registrationId,
+    action: r.action,
+    performedBy: r.performedBy,
+    note: r.note ?? undefined,
+    createdAt: r.createdAt.toISOString(),
+  }))
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────
