@@ -2,9 +2,20 @@
 
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
-import { Search, Plus } from "lucide-react"
+import { Search, Plus, MoreHorizontal, Pencil, Archive, Eye, Trash2 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import type { SupplierListItem, SupplierStatus } from "@/lib/supplier-types"
+import type { SupplierListItem } from "@/lib/supplier-types"
 import { SUPPLIER_TYPE_MAP, GRADE_MAP } from "@/lib/supplier-types"
 
 type FilterTab = "active" | "pending" | "issue"
@@ -14,11 +25,15 @@ interface SupplierListPanelProps {
   selectedId: string | null
   onSelect: (id: string) => void
   onNewClick: () => void
+  onEditRequest: (id: string) => void
+  onArchive: (id: string, name: string) => void
+  onDelete: (id: string, name: string) => void
 }
 
-export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick }: SupplierListPanelProps) {
+export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick, onEditRequest, onArchive, onDelete }: SupplierListPanelProps) {
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("active")
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
 
   const counts = useMemo(() => ({
     active: suppliers.filter(s => s.status === "active").length,
@@ -108,7 +123,7 @@ export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick 
               key={sup.id}
               onClick={() => onSelect(sup.id)}
               className={cn(
-                "rounded-xl p-3.5 px-4 cursor-pointer transition-all border mb-1",
+                "group rounded-xl p-3.5 px-4 cursor-pointer transition-all border mb-1",
                 isSelected
                   ? "bg-card border-primary shadow-sm border-l-4 border-l-primary"
                   : "border-transparent hover:bg-card hover:border-border"
@@ -118,12 +133,36 @@ export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick 
                 <span className="text-[14px] font-bold text-foreground leading-tight">
                   {flag} {sup.supplierName}
                 </span>
-                <span className={cn(
-                  "rounded-lg px-2 py-0.5 text-[10px] font-extrabold text-card bg-gradient-to-br",
-                  gradeGradient
-                )}>
-                  {sup.grade}
-                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className={cn(
+                    "rounded-lg px-2 py-0.5 text-[10px] font-extrabold text-card bg-gradient-to-br",
+                    gradeGradient
+                  )}>
+                    {sup.grade}
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div role="button" tabIndex={0} className="flex h-6 w-6 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10" onClick={(e) => e.stopPropagation()}>
+                        <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(sup.id) }}>
+                        <Eye className="mr-2 h-3.5 w-3.5" /> View Detail
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditRequest(sup.id) }}>
+                        <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-amber-600 focus:text-amber-600" onClick={(e) => { e.stopPropagation(); onArchive(sup.id, sup.supplierName) }}>
+                        <Archive className="mr-2 h-3.5 w-3.5" /> Archive
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: sup.id, name: sup.supplierName }) }}>
+                        <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               <div className="text-[11px] text-muted-foreground mt-0.5">
@@ -154,6 +193,29 @@ export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick 
           )
         })}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบซัพพลายเออร์</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ &quot;{deleteTarget?.name}&quot; อย่างถาวรใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) onDelete(deleteTarget.id, deleteTarget.name)
+                setDeleteTarget(null)
+              }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

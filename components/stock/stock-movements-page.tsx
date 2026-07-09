@@ -1,20 +1,39 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeftRight, Plus, Download, Upload } from "lucide-react"
+import { ArrowLeftRight, Plus, Download, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StockMovementsTab } from "./stock-movements-tab"
 import { CreateMovementDialog } from "./create-movement-dialog"
-import { mockStockMovements } from "@/lib/stock-mock-data"
+import { useStockMovements, useStockCards } from "@/lib/hooks/use-stock"
+import { exportMovementsToExcel } from "@/lib/stock-export"
+import { toast } from "sonner"
 
 export function StockMovementsPage() {
   const [showCreate, setShowCreate] = useState(false)
+  const { movements, isLoading, mutate } = useStockMovements()
+  const { cards, mutate: mutateCards } = useStockCards()
 
-  // Quick stats
-  const total = mockStockMovements.length
-  const approved = mockStockMovements.filter((m) => m.status === "approved").length
-  const pending = mockStockMovements.filter((m) => m.status === "pending").length
-  const draft = mockStockMovements.filter((m) => m.status === "draft").length
+  // Quick stats derived from live movements.
+  const total = movements.length
+  const approved = movements.filter((m) => m.status === "approved").length
+  const pending = movements.filter((m) => m.status === "pending").length
+  const draft = movements.filter((m) => m.status === "draft").length
+
+  function handleExport() {
+    if (movements.length === 0) {
+      toast.error("No movements to export")
+      return
+    }
+    exportMovementsToExcel(movements)
+    toast.success(`Exported ${movements.length} movements to Excel`)
+  }
+
+  function handleCreated() {
+    // Refresh both the ledger and card balances (movements mutate stock).
+    mutate()
+    mutateCards()
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -30,7 +49,7 @@ export function StockMovementsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-xl text-[12px]">
+          <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-xl text-[12px]" onClick={handleExport}>
             <Download className="h-3.5 w-3.5" /> Export
           </Button>
           <Button size="sm" className="h-9 gap-1.5 rounded-xl text-[12px] bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setShowCreate(true)}>
@@ -63,11 +82,17 @@ export function StockMovementsPage() {
           </div>
 
           {/* Table */}
-          <StockMovementsTab data={mockStockMovements} />
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border py-16 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading movements...
+            </div>
+          ) : (
+            <StockMovementsTab data={movements} />
+          )}
         </div>
       </div>
 
-      <CreateMovementDialog open={showCreate} onOpenChange={setShowCreate} />
+      <CreateMovementDialog open={showCreate} onOpenChange={setShowCreate} cards={cards} onCreated={handleCreated} />
     </div>
   )
 }

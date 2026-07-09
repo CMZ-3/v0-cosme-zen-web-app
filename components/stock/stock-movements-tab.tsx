@@ -1,23 +1,33 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Search, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import type { StockMovement, MovementType, MovementStatus } from "@/lib/stock-types"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
+import type { StockMovement, MovementType } from "@/lib/stock-types"
 import { movementTypeLabels, movementTypeColors, movementStatusColors } from "@/lib/stock-types"
 
 interface StockMovementsTabProps {
   data: StockMovement[]
+  onRefresh?: () => void
 }
 
-export function StockMovementsTab({ data }: StockMovementsTabProps) {
+export function StockMovementsTab({ data, onRefresh }: StockMovementsTabProps) {
+  const router = useRouter()
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; ref: string } | null>(null)
+  const [busy, setBusy] = useState(false)
 
   const filtered = useMemo(() => {
     return data.filter((mv) => {
@@ -31,6 +41,23 @@ export function StockMovementsTab({ data }: StockMovementsTabProps) {
       return matchSearch && matchType && matchStatus
     })
   }, [data, search, typeFilter, statusFilter])
+
+  const handleDelete = async (id: string, ref: string) => {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/stock/movements/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        toast.success(`ลบ movement ${ref} แล้ว`)
+        onRefresh?.()
+        router.refresh()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setBusy(false)
+      setDeleteTarget(null)
+    }
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -94,26 +121,35 @@ export function StockMovementsTab({ data }: StockMovementsTabProps) {
               </tr>
             ) : (
               filtered.map((mv) => {
-                const isIncoming = ["buy_in", "adjust_in", "return", "found"].includes(mv.movementType)
+                const isIncoming = ["buy_in", "adjust_in", "return", "found", "release"].includes(mv.movementType)
+                const isNeutral = ["reserve", "transfer"].includes(mv.movementType)
+                const typeLabel = movementTypeLabels[mv.movementType] ?? mv.movementType
+                const typeColor = movementTypeColors[mv.movementType] ?? "bg-zinc-100 text-zinc-600"
+                const sign = isNeutral ? "" : isIncoming ? "+" : "-"
+                const qtyColor = isNeutral
+                  ? "text-amber-600"
+                  : isIncoming
+                  ? "text-emerald-600"
+                  : "text-red-600"
                 return (
                   <tr key={mv.id} className="border-b border-border transition-colors hover:bg-primary/[0.02]">
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-md">{mv.referenceNumber}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant="outline" className={`text-[10px] px-2 py-0.5 rounded-lg border-0 font-semibold ${movementTypeColors[mv.movementType]}`}>
-                        {isIncoming ? "+" : "-"} {movementTypeLabels[mv.movementType]}
+                      <Badge variant="outline" className={`text-[10px] px-2 py-0.5 rounded-lg border-0 font-semibold ${typeColor}`}>
+                        {sign && `${sign} `}{typeLabel}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-mono text-[11px] text-primary">{mv.itemCode}</span>
+                        {mv.itemCode && <span className="font-mono text-[11px] text-primary">{mv.itemCode}</span>}
                         <span className="text-xs text-muted-foreground">{mv.itemName}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`font-mono text-xs font-bold ${isIncoming ? "text-emerald-600" : "text-red-600"}`}>
-                        {isIncoming ? "+" : "-"}{mv.quantity.toLocaleString()}
+                      <span className={`font-mono text-xs font-bold ${qtyColor}`}>
+                        {sign}{mv.quantity.toLocaleString()}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -133,8 +169,16 @@ export function StockMovementsTab({ data }: StockMovementsTabProps) {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="text-xs gap-2"><Pencil className="h-3 w-3" /> Edit</DropdownMenuItem>
-                            <DropdownMenuItem className="text-xs gap-2 text-destructive"><Trash2 className="h-3 w-3" /> Delete</DropdownMenuItem>
+                            <DropdownMenuItem className="text-xs gap-2" onClick={() => toast.info(`Edit ${mv.referenceNumber} — ใช้ Create Movement Dialog เพื่อแก้ไข`)}>
+                              <Pencil className="h-3 w-3" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-xs gap-2 text-destructive focus:text-destructive"
+                              disabled={busy}
+                              onClick={() => setDeleteTarget({ id: mv.id, ref: mv.referenceNumber })}
+                            >
+                              <Trash2 className="h-3 w-3" /> Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       ) : (
@@ -148,6 +192,27 @@ export function StockMovementsTab({ data }: StockMovementsTabProps) {
           </tbody>
         </table>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบ Movement</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ movement &quot;{deleteTarget?.ref}&quot; อย่างถาวรใช่หรือไม่?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={busy}
+              onClick={() => deleteTarget && handleDelete(deleteTarget.id, deleteTarget.ref)}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

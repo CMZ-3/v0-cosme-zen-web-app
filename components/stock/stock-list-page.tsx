@@ -4,7 +4,6 @@ import { useState } from "react"
 import {
   Package,
   Download,
-  RotateCcw,
   BarChart3,
   FlaskConical,
   Lock,
@@ -13,8 +12,15 @@ import {
   AlertTriangle,
   BookOpen,
   PackageOpen,
+  Plus,
+  Upload,
+  Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import { AddStockDialog } from "./add-stock-dialog"
+import { ImportStockDialog } from "./import-stock-dialog"
+import { exportStockToExcel } from "@/lib/stock-export"
 import { StockKpiCards } from "./stock-kpi-cards"
 import { StockOverviewTable } from "./stock-overview-table"
 import { StockMovementsTab } from "./stock-movements-tab"
@@ -26,29 +32,85 @@ import { StockReservedTab } from "./stock-reserved-tab"
 import { StockGuideTab } from "./stock-guide-tab"
 import { StockSimulationProvider } from "@/lib/stock-simulation-context"
 import {
-  mockStockDashboard,
   mockStockCards,
   mockStockMovements,
   mockAlerts,
-  mockReservations,
 } from "@/lib/stock-mock-data"
+import { useStockCards, useStockMovements } from "@/lib/hooks/use-stock"
 import { cn } from "@/lib/utils"
 
 type StockTab = "overview" | "simulator" | "reserved" | "incoming" | "receive" | "movements" | "alerts" | "guide"
 
-const tabs: { key: StockTab; label: string; icon: typeof BarChart3; badge?: number; badgeColor?: string }[] = [
-  { key: "overview", label: "Overview", icon: Package },
-  { key: "simulator", label: "Simulator", icon: FlaskConical },
-  { key: "reserved", label: "Reserved", icon: Lock, badge: mockReservations.filter((r) => r.status === "active").length, badgeColor: "bg-amber-500" },
-  { key: "incoming", label: "Incoming", icon: Truck, badge: 3, badgeColor: "bg-blue-500" },
-  { key: "receive", label: "Receive", icon: PackageOpen, badge: 2, badgeColor: "bg-emerald-500" },
-  { key: "movements", label: "Movements", icon: ClipboardList },
-  { key: "alerts", label: "Alerts", icon: AlertTriangle, badge: mockAlerts.filter((a) => !a.isResolved).length, badgeColor: "bg-destructive" },
-  { key: "guide", label: "Guide", icon: BookOpen },
-]
-
 export function StockListPage() {
   const [activeTab, setActiveTab] = useState<StockTab>("overview")
+  const [addOpen, setAddOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+
+  // Live data from the database (Neon). Fall back to mock while loading or on
+  // error so the UI never blanks out during fetch.
+  const { cards, isLoading: cardsLoading, mutate: mutateCards } = useStockCards()
+  const { movements, isLoading: movementsLoading } = useStockMovements()
+  const liveCards = cards.length > 0 ? cards : mockStockCards
+  const liveMovements = movements.length > 0 ? movements : mockStockMovements
+
+  // Compute dashboard KPIs directly from live stock cards so stats always
+  // reflect the real database instead of the static mock dashboard object.
+  const liveDashboard = {
+    totalItems: liveCards.length,
+    totalInventoryValue: liveCards.reduce((s, c) => s + c.balance * 10, 0), // rough estimate
+    statusBreakdown: {
+      healthy: liveCards.filter((c) => c.inventoryStatus === "healthy").length,
+      low: liveCards.filter((c) => c.inventoryStatus === "low").length,
+      outOfStock: liveCards.filter((c) => c.inventoryStatus === "out_of_stock").length,
+      overStock: liveCards.filter((c) => c.inventoryStatus === "over_stock").length,
+    },
+    totalIncoming: liveCards.reduce((s, c) => s + c.incomingStock, 0),
+    totalReserved: liveCards.reduce((s, c) => s + c.reservedStock, 0),
+    totalAvailable: liveCards.reduce((s, c) => s + c.available, 0),
+  }
+
+  // Export the current live catalog to a formatted .xlsx workbook.
+  const handleExport = () => {
+    if (liveCards.length === 0) {
+      toast.error("ไม่มีข้อมูลให้ส่งออก")
+      return
+    }
+    try {
+      exportStockToExcel(liveCards)
+      toast.success(`ส่งออก ${liveCards.length} รายการเป็น Excel แล้ว`)
+    } catch {
+      toast.error("ส่งออกไม่สำเร็จ")
+    }
+  }
+
+  // Open the print-ready stock report in a new tab (print / save as PDF there).
+  const handlePrintReport = () => {
+    window.open("/stock/report/print", "_blank", "noopener,noreferrer")
+  }
+
+  // Tab definitions with live badge counts.
+  const tabs: { key: StockTab; label: string; icon: typeof BarChart3; badge?: number; badgeColor?: string }[] = [
+    { key: "overview", label: "Overview", icon: Package },
+    { key: "simulator", label: "Simulator", icon: FlaskConical },
+    {
+      key: "reserved",
+      label: "Reserved",
+      icon: Lock,
+      badge: liveDashboard.totalReserved > 0 ? undefined : undefined, // driven by workflow context badge below
+      badgeColor: "bg-amber-500",
+    },
+    { key: "incoming", label: "Incoming", icon: Truck, badge: liveCards.filter((c) => c.incomingStock > 0).length, badgeColor: "bg-blue-500" },
+    { key: "receive", label: "Receive", icon: PackageOpen, badgeColor: "bg-emerald-500" },
+    { key: "movements", label: "Movements", icon: ClipboardList },
+    {
+      key: "alerts",
+      label: "Alerts",
+      icon: AlertTriangle,
+      badge: liveDashboard.statusBreakdown.low + liveDashboard.statusBreakdown.outOfStock,
+      badgeColor: "bg-destructive",
+    },
+    { key: "guide", label: "Guide", icon: BookOpen },
+  ]
 
   return (
     <StockSimulationProvider>
@@ -67,11 +129,36 @@ export function StockListPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-xl text-[12px]">
-              <Download className="h-3.5 w-3.5" /> Export CSV
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 rounded-xl text-[12px]"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="h-3.5 w-3.5" /> Import Excel
             </Button>
-            <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-xl text-[12px]">
-              <RotateCcw className="h-3.5 w-3.5" /> Reset
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 rounded-xl text-[12px]"
+              onClick={handleExport}
+            >
+              <Download className="h-3.5 w-3.5" /> Export Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 rounded-xl text-[12px]"
+              onClick={handlePrintReport}
+            >
+              <Printer className="h-3.5 w-3.5" /> Print Report
+            </Button>
+            <Button
+              size="sm"
+              className="h-9 gap-1.5 rounded-xl text-[12px]"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="h-3.5 w-3.5" /> Add New Stock
             </Button>
           </div>
         </div>
@@ -80,7 +167,7 @@ export function StockListPage() {
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex flex-col gap-5">
             {/* KPI Cards */}
-            <StockKpiCards data={mockStockDashboard} />
+            <StockKpiCards data={liveDashboard} />
 
             {/* Tab Bar */}
             <div className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1 shadow-sm">
@@ -120,7 +207,10 @@ export function StockListPage() {
                     actual quantity ready for use / sales commitment
                   </div>
                 </div>
-                <StockOverviewTable data={mockStockCards} />
+                <StockOverviewTable data={liveCards} />
+                {cardsLoading && (
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground">Syncing with database…</p>
+                )}
               </div>
             )}
 
@@ -150,7 +240,10 @@ export function StockListPage() {
 
             {activeTab === "movements" && (
               <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-                <StockMovementsTab data={mockStockMovements} />
+                <StockMovementsTab data={liveMovements} />
+                {movementsLoading && (
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground">Syncing with database…</p>
+                )}
               </div>
             )}
 
@@ -168,6 +261,19 @@ export function StockListPage() {
           </div>
         </div>
       </div>
+
+      <AddStockDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        categories={Array.from(new Set(liveCards.map((c) => c.category).filter(Boolean)))}
+        units={Array.from(new Set(liveCards.map((c) => c.unit).filter(Boolean)))}
+        onCreated={() => mutateCards()}
+      />
+      <ImportStockDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => mutateCards()}
+      />
     </StockSimulationProvider>
   )
 }

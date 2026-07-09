@@ -4,7 +4,14 @@
 
 // Stock Card (Master Data)
 export type StockStatus = "active" | "inactive" | "discontinued"
-export type ItemType = "raw_material" | "packaging" | "finished_good"
+export type ItemType =
+  | "raw_material"
+  | "packaging"
+  | "packaging_aux"
+  | "finished_good"
+  | "overhead"
+  | "labor"
+  | "tester"
 export type InventoryStatus = "healthy" | "low" | "out_of_stock" | "over_stock"
 
 export interface StockCard {
@@ -38,6 +45,37 @@ export interface StockCard {
   updatedAt: string
 }
 
+// Shape produced by the Excel import generator (scripts/gen-stock-import.mjs)
+// and consumed by the seed route when inserting into stock_cards.
+export interface StockCardImport {
+  id: string
+  itemCode: string
+  itemName: string
+  itemNameEn: string
+  itemType: ItemType
+  category: string
+  unit: string
+  balance: number
+  reservedStock: number
+  incomingStock: number
+  available: number
+  initialStock: number
+  minStock: number
+  maxStock: number
+  reorderPoint: number
+  unitCost: number
+  supplier: string | null
+  location: string | null
+  barcode: string | null
+  tradeName: string | null
+  inciName: string | null
+  casNo: string | null
+  storageTemp: string | null
+  expiryDate: string | null
+  status: StockStatus
+  inventoryStatus: InventoryStatus
+}
+
 // Stock Dashboard KPI
 export interface StockDashboard {
   totalItems: number
@@ -52,6 +90,7 @@ export interface StockDashboard {
 export type MovementType =
   | "buy_in" | "use_out" | "adjust_in" | "adjust_out"
   | "transfer" | "production" | "return" | "damage" | "loss" | "found"
+  | "reserve" | "release"
 
 export type MovementStatus = "draft" | "pending" | "approved" | "rejected"
 
@@ -153,15 +192,23 @@ export interface StmDocument {
 
 // Color / label maps
 export const itemTypeLabels: Record<ItemType, string> = {
-  raw_material: "Raw Material",
-  packaging: "Packaging",
-  finished_good: "Finished Good",
+  raw_material: "วัตถุดิบ (RM)",
+  packaging: "บรรจุภัณฑ์ (PK)",
+  packaging_aux: "อุปกรณ์บรรจุ (PA)",
+  finished_good: "สินค้าสำเร็จรูป (FG)",
+  overhead: "ค่าโสหุ้ย (OH)",
+  labor: "ค่าแรง (Labor)",
+  tester: "เทสเตอร์ (Tester)",
 }
 
 export const itemTypeColors: Record<ItemType, string> = {
   raw_material: "bg-blue-100 text-blue-700",
   packaging: "bg-amber-100 text-amber-700",
+  packaging_aux: "bg-orange-100 text-orange-700",
   finished_good: "bg-emerald-100 text-emerald-700",
+  overhead: "bg-zinc-100 text-zinc-600",
+  labor: "bg-purple-100 text-purple-700",
+  tester: "bg-pink-100 text-pink-700",
 }
 
 export const stockStatusColors: Record<StockStatus, string> = {
@@ -195,6 +242,8 @@ export const movementTypeLabels: Record<MovementType, string> = {
   damage: "Damage",
   loss: "Loss",
   found: "Found",
+  reserve: "Reserve",
+  release: "Release",
 }
 
 export const movementTypeColors: Record<MovementType, string> = {
@@ -208,6 +257,8 @@ export const movementTypeColors: Record<MovementType, string> = {
   damage: "bg-red-100 text-red-700",
   loss: "bg-pink-100 text-pink-700",
   transfer: "bg-blue-100 text-blue-700",
+  reserve: "bg-amber-100 text-amber-700",
+  release: "bg-sky-100 text-sky-700",
 }
 
 export const movementStatusColors: Record<MovementStatus, string> = {

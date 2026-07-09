@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import useSWR from "swr"
 import {
   Dialog,
   DialogContent,
@@ -22,23 +23,23 @@ import {
 } from "@/components/ui/select"
 import { PackageCheck, Truck, MapPin, User, FileText } from "lucide-react"
 
-const mockCustomers = [
-  { id: "cust-1", name: "Glow Lab Co., Ltd." },
-  { id: "cust-2", name: "SkinSoft Co., Ltd." },
-  { id: "cust-3", name: "NatuBeauty" },
-  { id: "cust-4", name: "BeautyKing Trading" },
-  { id: "cust-5", name: "PureMind Co., Ltd." },
-  { id: "cust-6", name: "LuxeSkin Intl." },
-]
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 const shippingMethods = ["Kerry Express", "Flash Express", "J&T Express", "Grab Express", "Lalamove"]
 
 interface CreateDeliveryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCreated?: () => void
 }
 
-export function CreateDeliveryDialog({ open, onOpenChange }: CreateDeliveryDialogProps) {
+export function CreateDeliveryDialog({ open, onOpenChange, onCreated }: CreateDeliveryDialogProps) {
+  const { data: customersData } = useSWR<{ customers: { id: string; customerName: string }[] }>(
+    open ? "/api/customers" : null,
+    fetcher,
+  )
+  const customers = customersData?.customers ?? []
+
   const [customerId, setCustomerId] = useState("")
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split("T")[0])
   const [deliveryDate, setDeliveryDate] = useState("")
@@ -54,10 +55,48 @@ export function CreateDeliveryDialog({ open, onOpenChange }: CreateDeliveryDialo
   const [weightKg, setWeightKg] = useState("")
   const [boxesCount, setBoxesCount] = useState("")
   const [notes, setNotes] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = () => {
-    // In production: call deliveryApi.create(...)
-    onOpenChange(false)
+  const handleSubmit = async () => {
+    if (!customerId) return
+    const customer = customers.find((c) => c.id === customerId)
+    if (!customer) return
+    setIsSubmitting(true)
+    try {
+      const res = await fetch("/api/delivery-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId,
+          customerName: customer.customerName,
+          salesOrderRef: salesOrderRef.trim() || undefined,
+          orderDate,
+          deliveryDate: deliveryDate || undefined,
+          shippingMethod: shippingMethod || undefined,
+          trackingNumber: trackingNumber.trim() || undefined,
+          contactName: contactName.trim() || undefined,
+          contactPhone: contactPhone.trim() || undefined,
+          deliveryAddress: deliveryAddress.trim() || undefined,
+          deliveryCity: deliveryCity.trim() || undefined,
+          deliveryProvince: deliveryProvince.trim() || undefined,
+          deliveryPostalCode: deliveryPostalCode.trim() || undefined,
+          weightKg: weightKg ? parseFloat(weightKg) : undefined,
+          boxesCount: boxesCount ? parseInt(boxesCount) : undefined,
+          notes: notes.trim() || undefined,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? "Failed to create delivery order")
+      }
+      resetForm()
+      onOpenChange(false)
+      onCreated?.()
+    } catch (e) {
+      console.error("[v0] create delivery error:", e)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const resetForm = () => {
@@ -102,11 +141,11 @@ export function CreateDeliveryDialog({ open, onOpenChange }: CreateDeliveryDialo
                 <Label className="text-[11px] font-semibold text-muted-foreground">Customer <span className="text-destructive">*</span></Label>
                 <Select value={customerId} onValueChange={setCustomerId}>
                   <SelectTrigger className="mt-1 rounded-[10px] text-[13px]">
-                    <SelectValue placeholder="Select customer" />
+                    <SelectValue placeholder={customers.length === 0 ? "Loading..." : "Select customer"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockCustomers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.customerName}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -271,9 +310,9 @@ export function CreateDeliveryDialog({ open, onOpenChange }: CreateDeliveryDialo
           <Button
             className="rounded-[10px] bg-teal-500 hover:bg-teal-600 text-white text-[12px] font-bold shadow-[0_2px_8px_rgba(20,184,166,0.25)]"
             onClick={handleSubmit}
-            disabled={!customerId || !orderDate}
+            disabled={!customerId || !orderDate || isSubmitting}
           >
-            Create Delivery Order
+            {isSubmitting ? "Creating..." : "Create Delivery Order"}
           </Button>
         </DialogFooter>
       </DialogContent>

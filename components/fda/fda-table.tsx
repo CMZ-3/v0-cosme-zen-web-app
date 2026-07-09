@@ -1,13 +1,19 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Search, Eye, Pencil, Trash2, FileText, MoreHorizontal, CalendarClock, Factory, FlaskConical, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Search, Eye, Pencil, Trash2, FileText, CalendarClock, Factory, FlaskConical, X, Download, ChevronLeft, ChevronRight, Send, Copy } from "lucide-react"
+import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import type { FdaListItem, FdaStatus } from "@/lib/fda-types"
 import { REGISTRATION_TYPE_MAP, FDA_STATUS_MAP } from "@/lib/fda-types"
 import { cn } from "@/lib/utils"
@@ -15,6 +21,7 @@ import { cn } from "@/lib/utils"
 interface FdaTableProps {
   data: FdaListItem[]
   onRowClick: (id: string) => void
+  onDeleted?: (id: string) => void
 }
 
 const statusPills: { value: FdaStatus | "all"; label: string }[] = [
@@ -31,10 +38,87 @@ const extraFilters = [
   { label: "ส่วนผสม", icon: FlaskConical },
 ]
 
-export function FdaTable({ data, onRowClick }: FdaTableProps) {
+const PAGE_SIZE = 15
+
+export function FdaTable({ data, onRowClick, onDeleted }: FdaTableProps) {
+  const router = useRouter()
   const [search, setSearch] = useState("")
   const [activeStatus, setActiveStatus] = useState<FdaStatus | "all">("all")
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; code: string } | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const handleStatusChange = async (id: string, code: string, status: FdaStatus) => {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/fda/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "status", status }),
+      })
+      if (res.ok) {
+        toast.success(`${code} → ${FDA_STATUS_MAP[status].label}`)
+        router.refresh()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleDelete = async (id: string, code: string) => {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/fda/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        toast.success(`ลบ ${code} แล้ว`)
+        onDeleted?.(id)
+        router.refresh()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setBusy(null)
+      setDeleteTarget(null)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selected)
+    const toasts = toast.loading(`กำลังลบ ${ids.length} รายการ...`)
+    try {
+      await Promise.all(ids.map((id) => fetch(`/api/fda/${id}`, { method: "DELETE" })))
+      toast.dismiss(toasts)
+      toast.success(`ลบ ${ids.length} รายการแล้ว`)
+      setSelected(new Set())
+      router.refresh()
+    } catch {
+      toast.dismiss(toasts)
+      toast.error("เกิดข้อผิดพลาด")
+    }
+  }
+
+  const handleClone = async (id: string, code: string) => {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/fda/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clone" }),
+      })
+      if (res.ok) {
+        const { id: newId, registrationCode } = await res.json()
+        toast.success(`Clone จาก ${code} → ${registrationCode}`)
+        router.push(`/fda/${newId}`)
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
 
   const filtered = useMemo(() => {
     let list = data
@@ -55,6 +139,9 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
     }
     return list
   }, [data, search, activeStatus])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: data.length }
@@ -171,7 +258,7 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 ? (
+            {paged.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={11} className="py-16 text-center">
                   <div className="flex flex-col items-center gap-2">
@@ -182,7 +269,7 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((row) => {
+              paged.map((row) => {
                 const typeCfg = REGISTRATION_TYPE_MAP[row.registrationType]
                 const statusCfg = FDA_STATUS_MAP[row.status]
                 return (
@@ -277,32 +364,32 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
                         </Button>
                         {row.status === "draft" && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={busy === row.id} onClick={() => onRowClick(row.id)}>
                               <Pencil className="h-3.5 w-3.5 text-primary" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={busy === row.id} onClick={() => setDeleteTarget({ id: row.id, code: row.registrationCode })}>
                               <Trash2 className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           </>
                         )}
                         {row.status === "approved" && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
-                            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" title="Download Certificate" onClick={() => { onRowClick(row.id) }}>
+                            <Download className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         )}
                         {row.status === "submitted" && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={busy === row.id} title="Approve" onClick={() => handleStatusChange(row.id, row.registrationCode, "approved")}>
                               <FileText className="h-3.5 w-3.5 text-[#10b981]" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={busy === row.id} title="Reject" onClick={() => handleStatusChange(row.id, row.registrationCode, "rejected")}>
                               <X className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           </>
                         )}
                         {(row.status === "expired" || row.status === "rejected") && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
-                            <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={busy === row.id} title="Clone / Renew" onClick={() => handleClone(row.id, row.registrationCode)}>
+                            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         )}
                       </div>
@@ -314,6 +401,77 @@ export function FdaTable({ data, onRowClick }: FdaTableProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination Footer */}
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[12px] text-muted-foreground">
+          Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}-{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} registrations
+        </span>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </Button>
+          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPage(p)}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-semibold transition-all",
+                p === page ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-secondary"
+              )}
+            >
+              {p}
+            </button>
+          ))}
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบทะเบียน</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ &quot;{deleteTarget?.code}&quot; อย่างถาวรใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && handleDelete(deleteTarget.id, deleteTarget.code)}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Floating Bulk Action Bar */}
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 shadow-xl">
+          <span className="text-[12px] font-bold text-foreground">
+            {selected.size} selected
+          </span>
+          <div className="h-5 w-px bg-border" />
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Exporting ${selected.size} registrations...`)}>
+            <Download className="h-3 w-3" /> Export
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.info(`Submitting ${selected.size} registrations...`)}>
+            <Send className="h-3 w-3" /> Submit All
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleBulkDelete}>
+            <Trash2 className="h-3 w-3" /> Delete
+          </Button>
+          <button type="button" className="ml-1 flex h-6 w-6 items-center justify-center rounded-full hover:bg-secondary" onClick={() => setSelected(new Set())}>
+            <X className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

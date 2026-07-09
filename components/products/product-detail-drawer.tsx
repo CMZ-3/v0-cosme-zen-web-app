@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, Fragment } from "react"
+import useSWR from "swr"
 import {
   Sheet,
   SheetContent,
@@ -47,8 +48,8 @@ import {
   ChevronRight,
   ArrowRightLeft,
 } from "lucide-react"
-import { mockProductDetail, mockLots, mockAudit, mockSpecifications, mockAttributes, mockLotMovements, mockLotMovementSummary } from "@/lib/mock-data"
-import type { Product, ProductLot, AuditEntry, LotStatus, QCResult, QualityStatus, ProductSpecification, ProductAttribute, LotMovement, MovementType } from "@/lib/product-types"
+import { mockLots, mockAudit, mockSpecifications, mockAttributes, mockLotMovements, mockLotMovementSummary } from "@/lib/mock-data"
+import type { Product, ProductListItem, ProductLot, AuditEntry, LotStatus, QCResult, QualityStatus, ProductSpecification, ProductAttribute, LotMovement, MovementType } from "@/lib/product-types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -58,13 +59,38 @@ interface ProductDetailDrawerProps {
   productId: string | null
 }
 
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
 export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDetailDrawerProps) {
-  const product = mockProductDetail
+  const { data, isLoading } = useSWR<{ product: ProductListItem }>(
+    productId ? `/api/products/${productId}` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
   if (!productId) return null
+  // Cast to Product for sub-section compatibility; DB may not fill all fields
+  // so sub-sections fall back to "—" via optional chaining.
+  const product = data?.product as unknown as Product | undefined
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[720px] max-w-[720px] p-0 sm:max-w-[720px] gap-0">
+        {(isLoading || !product) ? (
+          <>
+            {/* SheetTitle is always required by Radix for accessibility */}
+            <SheetHeader className="sr-only">
+              <SheetTitle>Product Detail</SheetTitle>
+              <SheetDescription>Loading product information</SheetDescription>
+            </SheetHeader>
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center">
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <p className="mt-3 text-sm text-muted-foreground">{isLoading ? "Loading product..." : "Product not found"}</p>
+              </div>
+            </div>
+          </>
+        ) : (
+        <>
         {/* Hero Header */}
         <div className="shrink-0 border-b border-border bg-gradient-to-r from-secondary to-card px-6 py-5">
           <SheetHeader className="p-0 gap-0">
@@ -78,8 +104,8 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
                   <span className="font-mono font-bold text-primary">{product.sku}</span> - {product.packageSize} {product.containerType}
                 </SheetDescription>
                 <div className="mt-2 flex items-center gap-2">
-                  <Badge variant="outline" className="bg-[#ecfdf5] text-[#10b981] border-[#10b981]/20 text-[10px] font-bold">Active</Badge>
-                  <Badge variant="outline" className="bg-[#ecfdf5] text-[#10b981] border-[#10b981]/20 text-[10px] font-bold">FDA Approved</Badge>
+                  <Badge variant="outline" className={cn("text-[10px] font-bold", product.status === "active" ? "bg-[#ecfdf5] text-[#10b981] border-[#10b981]/20" : "bg-secondary text-muted-foreground")}>{product.status}</Badge>
+                  <Badge variant="outline" className={cn("text-[10px] font-bold", product.fdaStatus === "approved" ? "bg-[#ecfdf5] text-[#10b981] border-[#10b981]/20" : "bg-[#fffbeb] text-[#d97706] border-[#d97706]/20")}>{product.fdaStatus}</Badge>
                   <span className="text-[10px] text-muted-foreground">{product.customerName}</span>
                 </div>
               </div>
@@ -89,10 +115,10 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
           {/* Quick KPI */}
           <div className="mt-4 grid grid-cols-4 gap-2">
             {[
-              { label: "Total Produced", value: product.totalProduced.toLocaleString(), sub: "units" },
-              { label: "In Stock", value: product.inStockQty.toLocaleString(), sub: "units" },
-              { label: "Cost/Unit", value: `฿${product.totalCostPerUnit.toFixed(2)}`, sub: "COGS" },
-              { label: "Selling Price", value: product.sellingPrice ? `฿${product.sellingPrice}` : "-", sub: product.sellingPrice ? `Margin ${((1 - product.totalCostPerUnit / product.sellingPrice) * 100).toFixed(1)}%` : "" },
+              { label: "SKU", value: product!.sku, sub: "Product Code" },
+              { label: "Category", value: product!.category, sub: "Type" },
+              { label: "Cost/Unit", value: `฿${(product!.totalCostPerUnit ?? 0).toFixed(2)}`, sub: "COGS" },
+              { label: "Selling Price", value: product!.sellingPrice ? `฿${product!.sellingPrice}` : "--", sub: product!.sellingPrice && product!.totalCostPerUnit ? `Margin ${((1 - product!.totalCostPerUnit / product!.sellingPrice!) * 100).toFixed(1)}%` : "" },
             ].map((kpi, i) => (
               <div key={i} className="rounded-xl bg-card/80 border border-border p-2.5 text-center">
                 <div className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{kpi.label}</div>
@@ -147,16 +173,22 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
 
         {/* Footer Actions */}
         <div className="shrink-0 flex items-center gap-2 border-t border-border px-5 py-3">
-          <Button variant="outline" size="sm" className="gap-1.5 rounded-[10px] text-[11px] font-semibold">
-            <Printer className="h-3.5 w-3.5" />
-            Print
-          </Button>
+  <Button variant="outline" size="sm" className="gap-1.5 rounded-[10px] text-[11px] font-semibold" onClick={() => toast.success(`Printing ${product.sku}...`)}>
+<Printer className="h-3.5 w-3.5" />
+Print
+</Button>
+<Button size="sm" className="gap-1.5 rounded-[10px] bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-[#3b6fd4]" onClick={() => toast.info(`Editing ${product.nameInternal}`)}>
+<Edit className="h-3.5 w-3.5" />
+Edit Product
+</Button>
           <div className="flex-1" />
           <Button size="sm" className="gap-1.5 rounded-[10px] bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-[#3b6fd4]">
             <Edit className="h-3.5 w-3.5" />
             Edit Product
           </Button>
         </div>
+        </>
+        )}
       </SheetContent>
     </Sheet>
   )
@@ -252,11 +284,11 @@ function OverviewSection({ product }: { product: Product }) {
       {/* COGS Summary (9-9) */}
       <div className="grid grid-cols-5 gap-2">
         {[
-          { label: "Bulk", value: `฿${product.bulkCostPerUnit.toFixed(2)}`, color: "text-[#8b5cf6]" },
-          { label: "Packaging", value: `฿${product.packagingCostPerUnit.toFixed(2)}`, color: "text-[#f59e0b]" },
-          { label: "Labor", value: `฿${product.laborCostPerUnit.toFixed(2)}`, color: "text-[#06b6d4]" },
-          { label: "Overhead", value: `฿${product.overheadCostPerUnit.toFixed(2)}`, color: "text-[#64748b]" },
-          { label: "Total COGS", value: `฿${product.totalCostPerUnit.toFixed(2)}`, color: "text-primary" },
+          { label: "Bulk", value: `฿${(product.bulkCostPerUnit ?? 0).toFixed(2)}`, color: "text-[#8b5cf6]" },
+          { label: "Packaging", value: `฿${(product.packagingCostPerUnit ?? 0).toFixed(2)}`, color: "text-[#f59e0b]" },
+          { label: "Labor", value: `฿${(product.laborCostPerUnit ?? 0).toFixed(2)}`, color: "text-[#06b6d4]" },
+          { label: "Overhead", value: `฿${(product.overheadCostPerUnit ?? 0).toFixed(2)}`, color: "text-[#64748b]" },
+          { label: "Total COGS", value: `฿${(product.totalCostPerUnit ?? 0).toFixed(2)}`, color: "text-primary" },
         ].map((c, i) => (
           <div key={i} className="rounded-xl bg-[#1e293b] p-2.5 text-center">
             <div className="text-[8px] font-bold uppercase tracking-wide text-[#94a3b8]">{c.label}</div>
@@ -285,9 +317,9 @@ function OverviewSection({ product }: { product: Product }) {
       <SectionCard title="Inventory Summary">
         <div className="grid grid-cols-4 gap-2">
           {[
-            { label: "Total Lots", value: product.lotCount.toString() },
-            { label: "In Stock", value: product.inStockQty.toLocaleString() },
-            { label: "Total Produced", value: product.totalProduced.toLocaleString() },
+            { label: "Total Lots", value: (product.lotCount ?? 0).toString() },
+            { label: "In Stock", value: (product.inStockQty ?? 0).toLocaleString() },
+            { label: "Total Produced", value: (product.totalProduced ?? 0).toLocaleString() },
             { label: "Expiring (90d)", value: "1" },
           ].map((s, i) => (
             <div key={i} className="rounded-xl bg-secondary p-2.5 text-center">
@@ -320,12 +352,12 @@ function OverviewSection({ product }: { product: Product }) {
       <SectionCard title="QC Specification (Standard)">
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: "Color", value: product.qcSpec.color },
-            { label: "Scent", value: product.qcSpec.scent },
-            { label: "Texture", value: product.qcSpec.texture },
-            { label: "pH Range", value: product.qcSpec.phMin && product.qcSpec.phMax ? `${product.qcSpec.phMin} - ${product.qcSpec.phMax}` : "-" },
-            { label: "Viscosity (cPs)", value: product.qcSpec.viscosityMin && product.qcSpec.viscosityMax ? `${product.qcSpec.viscosityMin} - ${product.qcSpec.viscosityMax}` : "-" },
-            { label: "Specific Gravity", value: product.qcSpec.specificGravityMin && product.qcSpec.specificGravityMax ? `${product.qcSpec.specificGravityMin} - ${product.qcSpec.specificGravityMax}` : "-" },
+            { label: "Color", value: product.qcSpec?.color },
+            { label: "Scent", value: product.qcSpec?.scent },
+            { label: "Texture", value: product.qcSpec?.texture },
+            { label: "pH Range", value: product.qcSpec?.phMin && product.qcSpec?.phMax ? `${product.qcSpec.phMin} - ${product.qcSpec.phMax}` : "-" },
+            { label: "Viscosity (cPs)", value: product.qcSpec?.viscosityMin && product.qcSpec?.viscosityMax ? `${product.qcSpec.viscosityMin} - ${product.qcSpec.viscosityMax}` : "-" },
+            { label: "Specific Gravity", value: product.qcSpec?.specificGravityMin && product.qcSpec?.specificGravityMax ? `${product.qcSpec.specificGravityMin} - ${product.qcSpec.specificGravityMax}` : "-" },
           ].map((q, i) => (
             <div key={i} className="rounded-xl border border-border bg-card p-2.5">
               <div className="text-[9px] font-bold uppercase text-muted-foreground">{q.label}</div>
@@ -333,7 +365,7 @@ function OverviewSection({ product }: { product: Product }) {
             </div>
           ))}
         </div>
-        {product.qcSpec.appearance && (
+        {product.qcSpec?.appearance && (
           <div className="mt-2 rounded-xl bg-secondary p-2.5">
             <div className="text-[9px] font-bold uppercase text-muted-foreground">Appearance</div>
             <div className="mt-0.5 text-xs text-foreground">{product.qcSpec.appearance}</div>
@@ -368,7 +400,7 @@ function OverviewSection({ product }: { product: Product }) {
             </tr>
           </thead>
           <tbody>
-            {product.pricingTiers.map((tier) => (
+            {(product.pricingTiers ?? []).map((tier) => (
               <tr key={tier.id} className="border-b border-border last:border-0">
                 <td className="py-2 font-mono font-bold text-foreground">{tier.minQty.toLocaleString()} - {tier.maxQty ? tier.maxQty.toLocaleString() : "Unlimited"}</td>
                 <td className="py-2 text-right font-mono font-bold text-foreground">{"฿"}{tier.pricePerUnit}</td>
@@ -390,10 +422,10 @@ function BOMCostSection({ product }: { product: Product }) {
       {/* Cost Breakdown */}
       <div className="grid grid-cols-4 gap-2">
         {[
-          { label: "Bulk Cost", value: `฿${product.bulkCostPerUnit.toFixed(2)}`, color: "text-[#8b5cf6]" },
-          { label: "Pack Cost", value: `฿${product.packagingCostPerUnit.toFixed(2)}`, color: "text-[#f59e0b]" },
-          { label: "Labor", value: `฿${product.laborCostPerUnit.toFixed(2)}`, color: "text-[#06b6d4]" },
-          { label: "Total COGS", value: `฿${product.totalCostPerUnit.toFixed(2)}`, color: "text-primary" },
+          { label: "Bulk Cost", value: `฿${(product.bulkCostPerUnit ?? 0).toFixed(2)}`, color: "text-[#8b5cf6]" },
+          { label: "Pack Cost", value: `฿${(product.packagingCostPerUnit ?? 0).toFixed(2)}`, color: "text-[#f59e0b]" },
+          { label: "Labor", value: `฿${(product.laborCostPerUnit ?? 0).toFixed(2)}`, color: "text-[#06b6d4]" },
+          { label: "Total COGS", value: `฿${(product.totalCostPerUnit ?? 0).toFixed(2)}`, color: "text-primary" },
         ].map((c, i) => (
           <div key={i} className="rounded-xl bg-[#1e293b] p-3 text-center">
             <div className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">{c.label}</div>
@@ -420,7 +452,7 @@ function BOMCostSection({ product }: { product: Product }) {
             </tr>
           </thead>
           <tbody>
-            {product.bomItems.map((item) => (
+            {(product.bomItems ?? []).map((item) => (
               <tr key={item.id} className="border-b border-border last:border-0 group">
                 <td className="py-2">
                   <span className="rounded-md bg-secondary px-2 py-0.5 text-[9px] font-bold capitalize text-muted-foreground">{item.type}</span>
@@ -441,7 +473,7 @@ function BOMCostSection({ product }: { product: Product }) {
           <tfoot>
             <tr className="border-t border-border">
               <td colSpan={4} className="py-2 text-right text-[10px] font-bold text-muted-foreground">Total Packaging Cost:</td>
-              <td className="py-2 text-right font-mono text-sm font-extrabold text-primary">{"฿"}{product.packagingCostPerUnit.toFixed(2)}</td>
+              <td className="py-2 text-right font-mono text-sm font-extrabold text-primary">{"฿"}{(product.packagingCostPerUnit ?? 0).toFixed(2)}</td>
               <td></td>
             </tr>
           </tfoot>
@@ -814,13 +846,13 @@ function DocsSection({ product }: { product: Product }) {
           <div className="text-[9px] text-muted-foreground/70">PDF, PNG, JPG - COA, Spec Sheet, Artwork</div>
         </div>
       </div>
-      {product.attachments.length === 0 ? (
+      {(product.attachments ?? []).length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-border bg-secondary/50 p-8 text-center">
           <Paperclip className="mx-auto h-8 w-8 text-muted-foreground/40" />
           <p className="mt-2 text-[12px] font-semibold text-muted-foreground">No documents uploaded</p>
         </div>
       ) : (
-        product.attachments.map((att) => (
+        (product.attachments ?? []).map((att) => (
           <div key={att.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:bg-secondary/50">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fef2f2] text-[#ef4444]">
               <FileText className="h-5 w-5" />

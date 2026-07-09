@@ -2,8 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts"
-import { mockStockDashboard, mockAlerts } from "@/lib/stock-mock-data"
+import { Cell, Pie, PieChart } from "recharts"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { ArrowRight, AlertTriangle } from "lucide-react"
@@ -13,23 +12,32 @@ const AMBER = "#f59e0b"
 const RED = "#ef4444"
 const BLUE = "#4c8bf5"
 
-export function DashboardStockHealth() {
-  const { statusBreakdown: sb, totalInventoryValue } = mockStockDashboard
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function DashboardStockHealth({ liveData }: { liveData?: any }) {
+  const k = liveData?.kpi
+  const healthy = k?.healthy ?? 0
+  const low = k?.lowStock ?? 0
+  const outOfStock = k?.outOfStock ?? 0
+  const overStock = k?.overStock ?? 0
+  const totalInventoryValue = k?.totalInventoryValue ?? 0
+
   const donutData = [
-    { name: "Healthy", value: sb.healthy, fill: GREEN },
-    { name: "Low Stock", value: sb.low, fill: AMBER },
-    { name: "Out of Stock", value: sb.outOfStock, fill: RED },
-    { name: "Over Stock", value: sb.overStock, fill: BLUE },
+    { name: "Healthy", value: healthy, fill: GREEN },
+    { name: "Low Stock", value: low, fill: AMBER },
+    { name: "Out of Stock", value: outOfStock, fill: RED },
+    { name: "Over Stock", value: overStock, fill: BLUE },
   ]
-  const total = sb.healthy + sb.low + sb.outOfStock + sb.overStock
-  const unresolvedAlerts = mockAlerts.filter(a => !a.isResolved)
+  const total = healthy + low + outOfStock + overStock
+  const unresolvedAlerts: Array<{ id: string; itemName: string; alertType: string }> = []
+  if (low > 0) unresolvedAlerts.push({ id: "low", itemName: `${low} items`, alertType: "low_stock" })
+  if (outOfStock > 0) unresolvedAlerts.push({ id: "oos", itemName: `${outOfStock} items`, alertType: "out_of_stock" })
 
   return (
     <Card className="border border-border shadow-none">
       <CardHeader className="flex-row items-center justify-between pb-2 space-y-0">
         <div>
           <CardTitle className="text-sm font-extrabold text-foreground">{"Stock Health"}</CardTitle>
-          <p className="text-[11px] text-muted-foreground mt-0.5">{`${(totalInventoryValue / 1e6).toFixed(1)}M THB inventory`}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">{`${((totalInventoryValue ?? 0) / 1e6).toFixed(1)}M THB inventory`}</p>
         </div>
         <Link href="/stock" className="flex items-center gap-1 text-[11px] font-bold text-primary hover:underline">
           {"View all"}<ArrowRight className="h-3 w-3" />
@@ -47,18 +55,16 @@ export function DashboardStockHealth() {
             }}
             className="h-[140px] w-[140px] shrink-0"
           >
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Pie data={donutData} cx="50%" cy="50%" innerRadius={38} outerRadius={60} paddingAngle={3} dataKey="value" strokeWidth={0}>
-                  {donutData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <text x="50%" y="48%" textAnchor="middle" className="fill-foreground text-xl font-extrabold">{total}</text>
-                <text x="50%" y="62%" textAnchor="middle" className="fill-muted-foreground text-[10px]">{"items"}</text>
-              </PieChart>
-            </ResponsiveContainer>
+            <PieChart>
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Pie data={donutData} cx="50%" cy="50%" innerRadius={38} outerRadius={60} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                {donutData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Pie>
+              <text x="50%" y="48%" textAnchor="middle" className="fill-foreground text-xl font-extrabold">{total}</text>
+              <text x="50%" y="62%" textAnchor="middle" className="fill-muted-foreground text-[10px]">{"items"}</text>
+            </PieChart>
           </ChartContainer>
 
           {/* Legend */}

@@ -8,17 +8,32 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { movementTypeLabels } from "@/lib/stock-types"
-import type { MovementType } from "@/lib/stock-types"
-import { mockStockCards } from "@/lib/stock-mock-data"
+import type { MovementType, StockCard } from "@/lib/stock-types"
+import { toast } from "sonner"
 
 interface CreateMovementDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  cards: StockCard[]
+  onCreated?: () => void
 }
+
+// Movement types the dialog supports (backed by receive/issue on the server).
+const CREATE_TYPES: MovementType[] = [
+  "buy_in",
+  "adjust_in",
+  "return",
+  "found",
+  "use_out",
+  "adjust_out",
+  "damage",
+  "loss",
+]
+const INCOMING_TYPES = ["buy_in", "adjust_in", "return", "found"]
 
 const steps = ["Type & Item", "Quantity & Cost", "Lot Info", "Notes"]
 
-export function CreateMovementDialog({ open, onOpenChange }: CreateMovementDialogProps) {
+export function CreateMovementDialog({ open, onOpenChange, cards, onCreated }: CreateMovementDialogProps) {
   const [step, setStep] = useState(0)
   const [movementType, setMovementType] = useState<string>("")
   const [stockCardId, setStockCardId] = useState("")
@@ -28,10 +43,13 @@ export function CreateMovementDialog({ open, onOpenChange }: CreateMovementDialo
   const [expireDate, setExpireDate] = useState("")
   const [supplierLotNo, setSupplierLotNo] = useState("")
   const [notes, setNotes] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
-  const isIncoming = ["buy_in", "adjust_in", "return", "found"].includes(movementType)
+  const isIncoming = INCOMING_TYPES.includes(movementType)
+  const activeCards = cards.filter((c) => c.status === "active")
+  const selectedCard = cards.find((c) => c.id === stockCardId)
 
-  function handleClose() {
+  function reset() {
     setStep(0)
     setMovementType("")
     setStockCardId("")
@@ -41,12 +59,47 @@ export function CreateMovementDialog({ open, onOpenChange }: CreateMovementDialo
     setExpireDate("")
     setSupplierLotNo("")
     setNotes("")
+    setSubmitting(false)
+  }
+
+  function handleClose() {
+    reset()
     onOpenChange(false)
   }
 
+  async function handleSubmit() {
+    setSubmitting(true)
+    try {
+      const res = await fetch("/api/stock/movements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stockCardId,
+          movementType,
+          quantity: Number(quantity),
+          unitCost: isIncoming ? unitCost : undefined,
+          lotNumber: isIncoming ? lotNumber : undefined,
+          expireDate: isIncoming ? expireDate : undefined,
+          supplierLotNo: isIncoming ? supplierLotNo : undefined,
+          notes,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Failed to create movement")
+      toast.success(
+        `${movementTypeLabels[movementType as MovementType]} · ${quantity} ${selectedCard?.unit ?? ""} — ${selectedCard?.itemCode ?? ""}`,
+      )
+      onCreated?.()
+      handleClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create movement")
+      setSubmitting(false)
+    }
+  }
+
   const canNext =
-    step === 0 ? movementType && stockCardId :
-    step === 1 ? quantity && Number(quantity) > 0 :
+    step === 0 ? Boolean(movementType && stockCardId) :
+    step === 1 ? Boolean(quantity && Number(quantity) > 0) :
     true
 
   return (
@@ -60,7 +113,7 @@ export function CreateMovementDialog({ open, onOpenChange }: CreateMovementDialo
         {/* Progress */}
         <div className="flex gap-1 px-6 pt-3">
           {steps.map((_, i) => (
-            <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? "bg-blue-500" : "bg-secondary"}`} />
+            <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? "bg-teal-500" : "bg-secondary"}`} />
           ))}
         </div>
 
@@ -74,7 +127,7 @@ export function CreateMovementDialog({ open, onOpenChange }: CreateMovementDialo
                     <SelectValue placeholder="Select type..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {(Object.keys(movementTypeLabels) as MovementType[]).map((t) => (
+                    {CREATE_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>{movementTypeLabels[t]}</SelectItem>
                     ))}
                   </SelectContent>
@@ -87,13 +140,19 @@ export function CreateMovementDialog({ open, onOpenChange }: CreateMovementDialo
                     <SelectValue placeholder="Select item..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockStockCards.filter((c) => c.status === "active").map((c) => (
+                    {activeCards.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         <span className="font-mono text-xs">{c.itemCode}</span> - {c.itemName}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedCard && (
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Balance: <strong className="text-foreground">{selectedCard.balance.toLocaleString()} {selectedCard.unit}</strong>
+                    {" · "}Available: <strong className="text-foreground">{selectedCard.available.toLocaleString()} {selectedCard.unit}</strong>
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -111,36 +170,51 @@ export function CreateMovementDialog({ open, onOpenChange }: CreateMovementDialo
                   onChange={(e) => setQuantity(e.target.value)}
                   placeholder="0.00"
                 />
+                {!isIncoming && selectedCard && Number(quantity) > selectedCard.available && (
+                  <p className="mt-1.5 text-[11px] text-destructive">
+                    Exceeds available stock ({selectedCard.available.toLocaleString()} {selectedCard.unit})
+                  </p>
+                )}
               </div>
-              <div>
-                <Label className="text-xs font-semibold">Unit Cost (Admin only)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className="mt-1.5 rounded-xl font-mono"
-                  value={unitCost}
-                  onChange={(e) => setUnitCost(e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
+              {isIncoming && (
+                <div>
+                  <Label className="text-xs font-semibold">Unit Cost (optional)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className="mt-1.5 rounded-xl font-mono"
+                    value={unitCost}
+                    onChange={(e) => setUnitCost(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
             </div>
           )}
 
           {step === 2 && (
             <div className="flex flex-col gap-4">
-              <div>
-                <Label className="text-xs font-semibold">Lot Number (optional)</Label>
-                <Input className="mt-1.5 rounded-xl font-mono" value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} placeholder="LOT-XXXXXX" />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold">Expiry Date (optional)</Label>
-                <Input type="date" className="mt-1.5 rounded-xl" value={expireDate} onChange={(e) => setExpireDate(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold">Supplier Lot No. (optional)</Label>
-                <Input className="mt-1.5 rounded-xl" value={supplierLotNo} onChange={(e) => setSupplierLotNo(e.target.value)} placeholder="Supplier reference..." />
-              </div>
+              {isIncoming ? (
+                <>
+                  <div>
+                    <Label className="text-xs font-semibold">Lot Number (optional)</Label>
+                    <Input className="mt-1.5 rounded-xl font-mono" value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} placeholder="LOT-XXXXXX" />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold">Expiry Date (optional)</Label>
+                    <Input type="date" className="mt-1.5 rounded-xl" value={expireDate} onChange={(e) => setExpireDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold">Supplier Lot No. (optional)</Label>
+                    <Input className="mt-1.5 rounded-xl" value={supplierLotNo} onChange={(e) => setSupplierLotNo(e.target.value)} placeholder="Supplier reference..." />
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-xl bg-secondary p-4 text-xs text-muted-foreground">
+                  Lot tracking applies to incoming movements only. Outgoing quantities are depleted automatically using FEFO (first-expiry, first-out).
+                </div>
+              )}
             </div>
           )}
 
@@ -154,9 +228,9 @@ export function CreateMovementDialog({ open, onOpenChange }: CreateMovementDialo
                 <div className="font-semibold text-foreground mb-2">Summary</div>
                 <div className="flex flex-col gap-1">
                   <span>Type: <strong className="text-foreground">{movementTypeLabels[movementType as MovementType] ?? "-"}</strong></span>
-                  <span>Item: <strong className="text-foreground">{mockStockCards.find((c) => c.id === stockCardId)?.itemCode ?? "-"}</strong></span>
-                  <span>Quantity: <strong className="text-foreground">{quantity || "-"}</strong></span>
-                  {lotNumber && <span>Lot: <strong className="text-foreground">{lotNumber}</strong></span>}
+                  <span>Item: <strong className="text-foreground">{selectedCard?.itemCode ?? "-"}</strong></span>
+                  <span>Quantity: <strong className="text-foreground">{quantity || "-"} {selectedCard?.unit ?? ""}</strong></span>
+                  {isIncoming && lotNumber && <span>Lot: <strong className="text-foreground">{lotNumber}</strong></span>}
                 </div>
               </div>
             </div>
@@ -165,17 +239,17 @@ export function CreateMovementDialog({ open, onOpenChange }: CreateMovementDialo
 
         <DialogFooter className="px-6 pb-6 flex items-center gap-2">
           {step > 0 && (
-            <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setStep(step - 1)}>Back</Button>
+            <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setStep(step - 1)} disabled={submitting}>Back</Button>
           )}
           <div className="flex-1" />
-          <Button variant="outline" size="sm" className="rounded-xl" onClick={handleClose}>Cancel</Button>
+          <Button variant="outline" size="sm" className="rounded-xl" onClick={handleClose} disabled={submitting}>Cancel</Button>
           {step < steps.length - 1 ? (
-            <Button size="sm" className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white" disabled={!canNext} onClick={() => setStep(step + 1)}>
+            <Button size="sm" className="rounded-xl bg-teal-600 hover:bg-teal-700 text-white" disabled={!canNext} onClick={() => setStep(step + 1)}>
               Next
             </Button>
           ) : (
-            <Button size="sm" className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white" onClick={handleClose}>
-              Create Movement
+            <Button size="sm" className="rounded-xl bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? "Creating..." : "Create Movement"}
             </Button>
           )}
         </DialogFooter>

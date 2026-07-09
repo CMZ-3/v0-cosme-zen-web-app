@@ -1,17 +1,22 @@
 "use client"
 
+import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import {
   ArrowLeft, ChevronRight, Pencil, Package, MapPin, Thermometer,
-  Barcode, FlaskConical, ClipboardList, Lock, Layers, AlertTriangle,
+  Barcode, FlaskConical, ClipboardList, Lock, Layers, AlertTriangle, Info,
   TrendingUp, TrendingDown, ArrowDownToLine, DollarSign, Calendar,
-  FileText, ExternalLink,
+  FileText, ExternalLink, PackagePlus, ArrowLeftRight, Tags, Printer,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { BarcodeSVG } from "@/components/barcode/barcode-svg"
+import { resolveBarcodeValue } from "@/lib/barcode-utils"
+import { useStockCard } from "@/lib/hooks/use-stock"
 import {
   mockStockCards, mockStockMovements, mockStockLots, mockReservations, mockLinkedProducts,
 } from "@/lib/stock-mock-data"
@@ -21,11 +26,38 @@ import {
   movementStatusColors,
 } from "@/lib/stock-types"
 import { AvailabilityBar } from "@/components/stock/availability-bar"
+import { MovementDialog } from "@/components/stock/movement-dialog"
+import { AddStockDialog } from "@/components/stock/add-stock-dialog"
 
 export default function StockDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const card = mockStockCards.find((c) => c.id === params.id)
+  const cardId = typeof params.id === "string" ? params.id : null
+
+  // Live single-card record (card + lots + movements + reservations) from the
+  // database, with mock fallback while loading or if the row isn't seeded yet.
+  const { card: liveCard, lots: liveLots, movements: liveMovements, reservations: liveReservations } =
+    useStockCard(cardId)
+  const card = liveCard ?? mockStockCards.find((c) => c.id === params.id)
+
+  // Dialog state
+  const [movementDialogMode, setMovementDialogMode] = useState<"receive" | "issue" | null>(null)
+  const [addStockOpen, setAddStockOpen] = useState(false)
+
+  // Movement approval state -- spec 3.2: pending → approved, approved → reversed
+  const [movementStatuses, setMovementStatuses] = useState<Record<string, string>>({})
+  function getMovementStatus(mv: { id: string; status: string }) {
+    return movementStatuses[mv.id] ?? mv.status
+  }
+  function approveMovement(id: string, refNum: string) {
+    setMovementStatuses(prev => ({ ...prev, [id]: "approved" }))
+    toast.success(`Movement ${refNum} approved`, { description: "Balance ledger updated." })
+  }
+  function reverseMovement(id: string, refNum: string) {
+    if (!confirm(`Reverse movement ${refNum}? This will undo the ledger entry.`)) return
+    setMovementStatuses(prev => ({ ...prev, [id]: "reversed" }))
+    toast.warning(`Movement ${refNum} reversed`, { description: "Ledger entry has been reversed." })
+  }
 
   if (!card) {
     return (
@@ -38,9 +70,10 @@ export default function StockDetailPage() {
     )
   }
 
-  const cardMovements = mockStockMovements.filter((m) => m.stockCardId === card.id)
-  const cardLots = mockStockLots.filter((l) => l.stockCardId === card.id)
-  const cardReservations = mockReservations.filter((r) => r.stockCardId === card.id)
+  // Prefer live related data; fall back to mock filtered by card id.
+  const cardMovements = liveMovements.length > 0 ? liveMovements : mockStockMovements.filter((m) => m.stockCardId === card.id)
+  const cardLots = liveLots.length > 0 ? liveLots : mockStockLots.filter((l) => l.stockCardId === card.id)
+  const cardReservations = liveReservations.length > 0 ? liveReservations : mockReservations.filter((r) => r.stockCardId === card.id)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -71,9 +104,23 @@ export default function StockDetailPage() {
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">{card.itemName}</p>
           </div>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]">
-            <Pencil className="h-3 w-3" /> Edit
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => setMovementDialogMode("receive")}>
+              <PackagePlus className="h-3 w-3" /> Receive
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => setMovementDialogMode("issue")}>
+              <ArrowDownToLine className="h-3 w-3" /> Issue
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => setMovementDialogMode("receive")}>
+              <ArrowLeftRight className="h-3 w-3" /> Transfer
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => window.open(`/barcode?item=${card.itemCode}`, "_blank")}>
+              <Tags className="h-3 w-3" /> Label
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => setAddStockOpen(true)}>
+              <Pencil className="h-3 w-3" /> Edit
+            </Button>
+          </div>
         </div>
 
         {/* Quick Stats */}
@@ -127,8 +174,26 @@ export default function StockDetailPage() {
                   <DetailRow label="Unit" value={card.unit} />
                   {card.supplier && <DetailRow label="Supplier" value={card.supplier} />}
                   {card.location && <DetailRow label="Location" value={card.location} icon={MapPin} />}
-                  {card.barcode && <DetailRow label="Barcode" value={card.barcode} icon={Barcode} mono />}
                   {card.storageTemp && <DetailRow label="Storage Temp" value={card.storageTemp} icon={Thermometer} />}
+                </div>
+
+                {/* Scannable Code 128 barcode */}
+                <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-border bg-white p-4">
+                  <div className="flex w-full items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
+                      <Barcode className="h-3.5 w-3.5" /> Code 128
+                      <span className={cn(
+                        "rounded-full px-1.5 py-px text-[9px] font-bold",
+                        card.barcode ? "bg-blue-50 text-blue-600" : "bg-secondary text-muted-foreground",
+                      )}>
+                        {card.barcode ? "STORED" : "AUTO"}
+                      </span>
+                    </span>
+                    <Link href="/barcode" className="text-[11px] font-semibold text-primary hover:underline">
+                      Manage / Print
+                    </Link>
+                  </div>
+                  <BarcodeSVG value={resolveBarcodeValue(card)} height={54} barWidth={1.9} fontSize={13} />
                 </div>
               </div>
 
@@ -146,12 +211,78 @@ export default function StockDetailPage() {
                 </div>
               </div>
 
-              {/* Sufficiency Check */}
+              {/* ATP 4-Card Panel -- spec 3.3 */}
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm lg:col-span-2">
-                <h3 className="text-sm font-bold text-foreground mb-3">Quick Sufficiency Check</h3>
-                <div className="flex items-start gap-3 rounded-xl bg-[#e0f2fe] p-3 text-xs text-blue-800">
-                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>Enter a required quantity to check if this stock card has enough available material. Available: <strong className="font-bold">{card.available.toLocaleString()} {card.unit}</strong></span>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-foreground">Available-to-Promise (ATP)</h3>
+                  <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground font-mono">
+                    ATP = Physical &minus; Reserved + Incoming
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  {/* Physical */}
+                  <div className="rounded-2xl border border-border bg-secondary/40 p-4 text-center">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Physical</div>
+                    <div className="text-2xl font-extrabold text-foreground">{card.balance.toLocaleString()}</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">{card.unit}</div>
+                  </div>
+                  {/* Reserved */}
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-1">Reserved</div>
+                    <div className="text-2xl font-extrabold text-amber-700">{card.reservedStock.toLocaleString()}</div>
+                    <div className="text-[10px] text-amber-600 mt-0.5">{card.unit}</div>
+                  </div>
+                  {/* Incoming */}
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-center">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1">Incoming</div>
+                    <div className="text-2xl font-extrabold text-blue-700">+{card.incomingStock.toLocaleString()}</div>
+                    <div className="text-[10px] text-blue-600 mt-0.5">{card.unit}</div>
+                  </div>
+                  {/* ATP */}
+                  <div className={cn(
+                    "rounded-2xl border p-4 text-center",
+                    card.available <= 0
+                      ? "border-red-300 bg-red-50"
+                      : card.available <= card.minStock
+                      ? "border-amber-300 bg-amber-50"
+                      : "border-emerald-300 bg-emerald-50"
+                  )}>
+                    <div className={cn(
+                      "text-[10px] font-bold uppercase tracking-wider mb-1",
+                      card.available <= 0 ? "text-red-700" : card.available <= card.minStock ? "text-amber-700" : "text-emerald-700"
+                    )}>ATP</div>
+                    <div className={cn(
+                      "text-2xl font-extrabold",
+                      card.available <= 0 ? "text-red-700" : card.available <= card.minStock ? "text-amber-700" : "text-emerald-700"
+                    )}>{card.available.toLocaleString()}</div>
+                    <div className={cn(
+                      "text-[10px] mt-0.5",
+                      card.available <= 0 ? "text-red-600" : card.available <= card.minStock ? "text-amber-600" : "text-emerald-600"
+                    )}>{card.unit}</div>
+                  </div>
+                </div>
+                {/* Formula breakdown bar */}
+                <div className="h-2.5 rounded-full overflow-hidden flex bg-secondary">
+                  {card.balance > 0 && (
+                    <>
+                      <div
+                        className="h-full bg-amber-400 transition-all"
+                        style={{ width: `${Math.min((card.reservedStock / card.balance) * 100, 100)}%` }}
+                        title={`Reserved: ${card.reservedStock}`}
+                      />
+                      <div
+                        className="h-full bg-emerald-500 transition-all"
+                        style={{ width: `${Math.min((card.available / card.balance) * 100, 100)}%` }}
+                        title={`Available: ${card.available}`}
+                      />
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400 inline-block" />Reserved</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />Available / ATP</span>
+                  {card.available <= 0 && <span className="ml-auto font-bold text-red-600">Out of Stock</span>}
+                  {card.available > 0 && card.available <= card.minStock && <span className="ml-auto font-bold text-amber-600">Below Minimum</span>}
                 </div>
               </div>
             </div>
@@ -159,10 +290,28 @@ export default function StockDetailPage() {
 
           {/* Lots Tab */}
           <TabsContent value="lots" className="mt-5">
+            {/* FEFO Allocation Preview */}
+            <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <FlaskConical className="h-4 w-4 text-blue-700" />
+                <span className="text-sm font-bold text-blue-800">FEFO Allocation Engine</span>
+                <span className="ml-auto rounded-full bg-blue-100 border border-blue-300 px-2.5 py-0.5 text-[10px] font-bold text-blue-700">
+                  Expiry ASC, NULLS LAST
+                </span>
+              </div>
+              <p className="text-[11px] text-blue-700">
+                Allocation selects <strong>approved lots</strong> with non-expired stock, sorted by earliest expiry first.
+                Quarantined, expired, or unavailable lots are <span className="font-bold text-red-600">never auto-allocated</span>.
+                ATP = {card.available.toLocaleString()} {card.unit} available for reservation.
+              </p>
+            </div>
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              <div className="border-b border-border px-5 py-3">
-                <h3 className="text-sm font-bold text-foreground">Stock Lots (FEFO Order)</h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Opened lots first, then sealed by expiry date ascending</p>
+              <div className="border-b border-border px-5 py-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Stock Lots (FEFO Order)</h3>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Opened lots first, then sealed by expiry date ascending</p>
+                </div>
+                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary">{cardLots.length} lots</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-[13px]">
@@ -225,9 +374,19 @@ export default function StockDetailPage() {
 
           {/* Movements Tab */}
           <TabsContent value="movements" className="mt-5">
+            {/* Spec 3.2 info banner */}
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-[11px] text-blue-800">
+              <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-600" />
+              <span>Movements start as <strong>Pending</strong>. A Leader must <strong>Approve</strong> before the ledger balance updates. Approved movements can be <strong>Reversed</strong> to undo the entry.</span>
+            </div>
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              <div className="border-b border-border px-5 py-3">
+              <div className="border-b border-border px-5 py-3 flex items-center justify-between">
                 <h3 className="text-sm font-bold text-foreground">Movement History</h3>
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                  <span className="h-2 w-2 rounded-full bg-amber-400 inline-block" />Pending
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block ml-1" />Approved
+                  <span className="h-2 w-2 rounded-full bg-slate-400 inline-block ml-1" />Reversed
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-[13px]">
@@ -239,16 +398,21 @@ export default function StockDetailPage() {
                       <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</th>
                       <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
                       <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Notes</th>
+                      <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {cardMovements.length === 0 ? (
-                      <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">No movements for this stock card</td></tr>
+                      <tr><td colSpan={7} className="py-12 text-center text-muted-foreground">No movements for this stock card</td></tr>
                     ) : (
                       cardMovements.map((mv) => {
                         const isIncoming = ["buy_in", "adjust_in", "return", "found"].includes(mv.movementType)
+                        const mvStatus = getMovementStatus(mv)
                         return (
-                          <tr key={mv.id} className="border-b border-border transition-colors hover:bg-primary/[0.02]">
+                          <tr key={mv.id} className={cn(
+                            "border-b border-border transition-colors hover:bg-primary/[0.02]",
+                            mvStatus === "reversed" && "opacity-50",
+                          )}>
                             <td className="px-4 py-3">
                               <span className="font-mono text-xs font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-md">{mv.referenceNumber}</span>
                             </td>
@@ -258,19 +422,51 @@ export default function StockDetailPage() {
                               </Badge>
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <span className={cn("font-mono text-xs font-bold", isIncoming ? "text-emerald-600" : "text-red-600")}>
+                              <span className={cn("font-mono text-xs font-bold", isIncoming ? "text-emerald-600" : "text-red-600", mvStatus === "reversed" && "line-through")}>
                                 {isIncoming ? "+" : "-"}{mv.quantity.toLocaleString()}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <Badge variant="outline" className={cn("text-[10px] px-2 py-0.5 rounded-lg border-0 font-semibold capitalize", movementStatusColors[mv.status])}>
-                                {mv.status}
+                              <Badge variant="outline" className={cn(
+                                "text-[10px] px-2 py-0.5 rounded-lg border-0 font-semibold capitalize",
+                                mvStatus === "pending" ? "bg-amber-100 text-amber-700" :
+                                mvStatus === "approved" ? "bg-emerald-100 text-emerald-700" :
+                                mvStatus === "reversed" ? "bg-slate-100 text-slate-500" :
+                                movementStatusColors[mv.status]
+                              )}>
+                                {mvStatus}
                               </Badge>
                             </td>
                             <td className="px-4 py-3 text-xs text-muted-foreground">
                               {new Date(mv.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                             </td>
                             <td className="px-4 py-3 text-xs text-muted-foreground max-w-[200px] truncate">{mv.notes ?? "-"}</td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                {mvStatus === "pending" && (
+                                  <Button
+                                    size="sm"
+                                    className="h-6 px-2 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white rounded-md"
+                                    onClick={() => approveMovement(mv.id, mv.referenceNumber)}
+                                  >
+                                    Approve
+                                  </Button>
+                                )}
+                                {mvStatus === "approved" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 px-2 text-[10px] border-slate-300 text-slate-600 hover:bg-slate-100 rounded-md"
+                                    onClick={() => reverseMovement(mv.id, mv.referenceNumber)}
+                                  >
+                                    Reverse
+                                  </Button>
+                                )}
+                                {mvStatus === "reversed" && (
+                                  <span className="text-[10px] text-slate-400 italic">Reversed</span>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         )
                       })
@@ -364,6 +560,23 @@ export default function StockDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Receive / Issue Dialog */}
+      {movementDialogMode && (
+        <MovementDialog
+          card={card as Parameters<typeof MovementDialog>[0]["card"]}
+          mode={movementDialogMode}
+          open={true}
+          onOpenChange={(o) => { if (!o) setMovementDialogMode(null) }}
+        />
+      )}
+
+      {/* Edit / Add card dialog */}
+      <AddStockDialog
+        open={addStockOpen}
+        onOpenChange={setAddStockOpen}
+        onCreated={() => setAddStockOpen(false)}
+      />
     </div>
   )
 }

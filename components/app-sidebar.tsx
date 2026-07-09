@@ -18,17 +18,51 @@ import {
   PanelLeftClose,
   PanelLeft,
   ArrowLeftRight,
+  Barcode,
+  ClipboardCheck,
+  BellRing,
+  LayoutGrid,
+  ChevronDown,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useState } from "react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-const menuItems: { label: string; icon: typeof LayoutDashboard; href: string; badge?: number }[] = [
+type Icon = typeof LayoutDashboard
+
+interface NavItem {
+  label: string
+  icon: Icon
+  href: string
+  badge?: number
+}
+
+interface NavGroup {
+  label: string
+  icon: Icon
+  href: string
+  children: NavItem[]
+}
+
+const isGroup = (item: NavItem | NavGroup): item is NavGroup => "children" in item
+
+const menuItems: (NavItem | NavGroup)[] = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/" },
   { label: "Job Orders", icon: ClipboardList, href: "/job-orders", badge: 5 },
   { label: "Products", icon: ShoppingBag, href: "/products" },
-  { label: "Stock v3", icon: Package, href: "/stock" },
-  { label: "Movements", icon: ArrowLeftRight, href: "/stock/movements" },
+  {
+    label: "Stock Hub",
+    icon: Package,
+    href: "/stock",
+    children: [
+      { label: "Overview", icon: LayoutGrid, href: "/stock" },
+      { label: "Movements", icon: ArrowLeftRight, href: "/stock/movements" },
+      { label: "Stock Check", icon: ClipboardCheck, href: "/stock/checking" },
+      { label: "Alerts", icon: BellRing, href: "/stock/alerts" },
+    ],
+  },
+  { label: "Barcode", icon: Barcode, href: "/barcode" },
   { label: "Formulas", icon: FlaskConical, href: "/formulas" },
   { label: "Production", icon: Factory, href: "/production" },
   { label: "Customers", icon: Users, href: "/customers" },
@@ -50,21 +84,45 @@ interface AppSidebarProps {
 export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
   const pathname = usePathname()
 
+  // Routes that belong to a specific Stock Hub child, so "Overview" (/stock)
+  // does not stay highlighted while on a sibling route.
+  const stockChildPrefixes = ["/stock/movements", "/stock/checking", "/stock/alerts"]
+
+  const isItemActive = (href: string) => {
+    if (href === "/") return pathname === "/"
+    if (href === "/stock") {
+      return (
+        pathname === "/stock" ||
+        (pathname.startsWith("/stock/") && !stockChildPrefixes.some((p) => pathname.startsWith(p)))
+      )
+    }
+    return pathname === href || pathname.startsWith(href + "/")
+  }
+
+  const isGroupActive = (group: NavGroup) => group.children.some((c) => isItemActive(c.href))
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
+  const toggleGroup = (label: string) =>
+    setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }))
+
   const renderLink = (
-    item: { label: string; icon: typeof LayoutDashboard; href: string; badge?: number },
-    isActive: boolean
+    item: NavItem,
+    isActive: boolean,
+    opts?: { nested?: boolean }
   ) => {
+    const nested = opts?.nested
     const link = (
       <Link
         href={item.href}
         className={cn(
           "mb-0.5 flex items-center gap-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-secondary hover:text-foreground",
           collapsed ? "justify-center rounded-xl p-2.5" : "rounded-[10px] px-3.5 py-2.5",
+          nested && !collapsed && "py-2 text-[13px]",
           isActive &&
             "bg-primary text-primary-foreground font-semibold shadow-[0_2px_8px_rgba(76,139,245,0.3)] hover:bg-primary hover:text-primary-foreground"
         )}
       >
-        <item.icon className="h-[18px] w-[18px] shrink-0 opacity-75" />
+        <item.icon className={cn("shrink-0 opacity-75", nested ? "h-4 w-4" : "h-[18px] w-[18px]")} />
         {!collapsed && (
           <>
             <span className="truncate">{item.label}</span>
@@ -104,6 +162,73 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
     return <div key={item.href}>{link}</div>
   }
 
+  const renderGroup = (group: NavGroup) => {
+    const groupActive = isGroupActive(group)
+    const open = openGroups[group.label] ?? groupActive
+
+    // Collapsed rail: show the group icon; hovering reveals the children as a
+    // flyout menu so the sub-nav stays reachable without expanding the sidebar.
+    if (collapsed) {
+      return (
+        <Tooltip key={group.label}>
+          <TooltipTrigger asChild>
+            <Link
+              href={group.href}
+              className={cn(
+                "mb-0.5 flex items-center justify-center rounded-xl p-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-secondary hover:text-foreground",
+                groupActive &&
+                  "bg-primary text-primary-foreground font-semibold shadow-[0_2px_8px_rgba(76,139,245,0.3)] hover:bg-primary hover:text-primary-foreground"
+              )}
+            >
+              <group.icon className="h-[18px] w-[18px] shrink-0 opacity-75" />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8} className="flex flex-col gap-0.5 p-1.5">
+            <span className="px-2 py-1 text-xs font-bold">{group.label}</span>
+            {group.children.map((child) => (
+              <Link
+                key={child.href}
+                href={child.href}
+                className={cn(
+                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                  isItemActive(child.href) && "bg-secondary text-foreground font-semibold"
+                )}
+              >
+                <child.icon className="h-3.5 w-3.5 shrink-0 opacity-75" />
+                {child.label}
+              </Link>
+            ))}
+          </TooltipContent>
+        </Tooltip>
+      )
+    }
+
+    return (
+      <div key={group.label}>
+        <button
+          type="button"
+          onClick={() => toggleGroup(group.label)}
+          aria-expanded={open}
+          className={cn(
+            "mb-0.5 flex w-full items-center gap-2.5 rounded-[10px] px-3.5 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-secondary hover:text-foreground",
+            groupActive && !open && "text-foreground"
+          )}
+        >
+          <group.icon className="h-[18px] w-[18px] shrink-0 opacity-75" />
+          <span className="truncate">{group.label}</span>
+          <ChevronDown
+            className={cn("ml-auto h-4 w-4 shrink-0 transition-transform", open ? "rotate-0" : "-rotate-90")}
+          />
+        </button>
+        {open && (
+          <div className="mb-1 ml-3.5 flex flex-col border-l border-border pl-2">
+            {group.children.map((child) => renderLink(child, isItemActive(child.href), { nested: true }))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <aside
       className={cn(
@@ -117,7 +242,9 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
           CZ
         </Link>
         {!collapsed && (
-          <span className="text-lg font-extrabold tracking-tight text-foreground">CosmeZen</span>
+          <span className="text-[13px] font-extrabold leading-tight tracking-tight text-foreground text-balance">
+            COSMEZEN SAAS CONTROL V7.0
+          </span>
         )}
         <button
           onClick={onToggle}
@@ -140,10 +267,9 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
         )}
         {collapsed && <div className="pt-1" />}
 
-        {menuItems.map((item) => {
-          const isActive = pathname.startsWith(item.href) && (item.href !== "/" || pathname === "/")
-          return renderLink(item, isActive)
-        })}
+        {menuItems.map((item) =>
+          isGroup(item) ? renderGroup(item) : renderLink(item, isItemActive(item.href))
+        )}
 
         {collapsed ? (
           <div className="my-3 mx-1 border-t border-border" />

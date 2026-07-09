@@ -3,6 +3,7 @@
 import { use, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import useSWR from "swr"
 import {
   ArrowLeft,
   PackageCheck,
@@ -23,6 +24,8 @@ import {
   Camera,
   Pen,
   ChevronRight,
+  FlaskConical,
+  Layers,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,23 +40,85 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { DeliveryWorkflowStepper } from "@/components/delivery/delivery-workflow-stepper"
+import { PickVerifyDialog } from "@/components/delivery/pick-verify-dialog"
 import { deliveryStatusMap } from "@/lib/delivery-types"
 import type { DeliveryStatus } from "@/lib/delivery-types"
 import {
-  mockDeliveryOrders,
   mockDeliveryLines,
   mockDeliveryAuditLogs,
   mockDeliveryPod,
-  customerAvatarColors,
 } from "@/lib/delivery-mock-data"
+import type { DeliveryOrder } from "@/lib/delivery-types"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+// Derive a deterministic gradient from a customer name for the avatar
+function getAvatarColor(name: string): string {
+  const palettes = [
+    "from-blue-400 to-blue-600",
+    "from-teal-400 to-teal-600",
+    "from-violet-400 to-violet-600",
+    "from-rose-400 to-rose-600",
+    "from-amber-400 to-amber-600",
+    "from-emerald-400 to-emerald-600",
+    "from-indigo-400 to-indigo-600",
+    "from-pink-400 to-pink-600",
+  ]
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return palettes[h % palettes.length]
+}
 
 export default function DeliveryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("overview")
+  const [verifyMode, setVerifyMode] = useState<"picking" | "shipping" | null>(null)
 
-  const order = useMemo(() => mockDeliveryOrders.find((o) => o.id === id), [id])
+  const { data, isLoading, mutate } = useSWR<{ order: DeliveryOrder }>(
+    `/api/delivery-orders/${id}`,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const order = data?.order ?? null
+  const [actionBusy, setActionBusy] = useState<string | null>(null)
+
+  const patchStatus = async (status: string) => {
+    setActionBusy(status)
+    try {
+      const res = await fetch(`/api/delivery-orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed")
+      toast.success(`Status updated to ${status}`)
+      await mutate()
+    } catch (e) {
+      toast.error("Action failed", { description: String(e) })
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
+  const orderLines = useMemo(() => {
+    const matched = mockDeliveryLines.filter((l) => l.deliveryOrderId === id)
+    return matched.length > 0 ? matched : mockDeliveryLines
+  }, [id])
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="mt-3 text-sm text-muted-foreground">Loading delivery order...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!order) {
     return (
@@ -69,7 +134,7 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
   }
 
   const statusInfo = deliveryStatusMap[order.status]
-  const avatarColor = customerAvatarColors[order.customerName] || "from-gray-400 to-gray-600"
+  const avatarColor = getAvatarColor(order.customerName)
   const initials = order.customerName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
 
   const formatDate = (dateStr?: string) => {
@@ -108,6 +173,26 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
             variant={a.variant}
             size="sm"
             className={cn("gap-1.5 rounded-[10px] text-[12px] font-semibold", a.variant === "default" && a.color && `${a.color} text-white`)}
+            disabled={!!actionBusy}
+            onClick={async () => {
+              const statusMap: Record<string, string> = {
+                "Reserve": "reserved",
+                "Start Picking": "picking",
+                "Ship": "shipped",
+                "Confirm Delivered": "delivered",
+                "Complete": "completed",
+                "Release": "draft",
+                "Cancel": "cancelled",
+              }
+              if (a.label === "Start Picking" && orderLines.length > 0) {
+                setVerifyMode("picking")
+              } else if (a.label === "Ship" && orderLines.length > 0) {
+                setVerifyMode("shipping")
+              } else {
+                const newStatus = statusMap[a.label]
+                if (newStatus) await patchStatus(newStatus)
+              }
+            }}
           >
             <a.icon className="h-3.5 w-3.5" />
             {a.label}
@@ -167,11 +252,11 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
             {renderStatusActions()}
             <div className="flex gap-2">
               {(order.status === "draft" || order.status === "reserved") && (
-                <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]">
+                <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]" onClick={() => router.push(`/delivery?id=${id}&edit=1`)}>
                   <Pencil className="h-3 w-3" /> Edit
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]">
+              <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]" onClick={() => window.open(`/delivery/${id}/print`, "_blank")}>
                 <Printer className="h-3 w-3" /> Print DO
               </Button>
             </div>
@@ -438,14 +523,55 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
 
           {/* Traceability Tab */}
           <TabsContent value="trace" className="mt-4">
-            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-20">
-              <Package className="h-10 w-10 text-muted-foreground/30" />
-              <p className="mt-3 text-sm font-bold text-foreground">Lot Traceability</p>
-              <p className="text-[11px] text-muted-foreground">Full traceability chain from raw materials to delivery coming soon</p>
-            </div>
+            <Card className="border-border rounded-2xl">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-[13px] font-bold">Lot Traceability Chain</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-0">
+                  {[
+                    { step: "Raw Material Receipt", desc: "Ingredients received from suppliers", icon: PackageCheck, color: "bg-blue-500", detail: "Lot tracked from PO → GRN → stock card" },
+                    { step: "Bulk Production (JO)", desc: order.salesOrderRef ? `Linked JO: ${order.salesOrderRef}` : "Job order batch production", icon: FlaskConical, color: "bg-violet-500", detail: "Formula → production steps → QC pass" },
+                    { step: "Filling & Packaging", desc: "Finished goods by lot", icon: Layers, color: "bg-amber-500", detail: "FG lot assigned per batch" },
+                    { step: "QC Release", desc: "Quality check passed", icon: ClipboardList, color: "bg-emerald-500", detail: "Certificate of analysis on file" },
+                    { step: "Delivery Dispatch", desc: order.deliveryNumber, icon: Truck, color: "bg-teal-500", detail: `Shipped: ${formatDate(order.shippedAt) || "--"} · Tracking: ${order.trackingNumber || "--"}` },
+                    { step: "Customer Receipt", desc: order.customerName, icon: User, color: "bg-indigo-500", detail: `Delivered: ${formatDate(order.actualDeliveryDate) || "--"} · Receiver: ${order.receiverName || "--"}` },
+                  ].map((node, i, arr) => (
+                    <div key={node.step} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white", node.color)}>
+                          <node.icon className="h-4 w-4" />
+                        </div>
+                        {i < arr.length - 1 && <div className="w-0.5 flex-1 my-1 bg-border" />}
+                      </div>
+                      <div className="pb-6 flex-1 min-w-0">
+                        <p className="text-[13px] font-bold text-foreground">{node.step}</p>
+                        <p className="text-[11px] text-muted-foreground">{node.desc}</p>
+                        <p className="text-[10px] text-muted-foreground/70 mt-0.5 font-mono">{node.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
+
+      <PickVerifyDialog
+        open={verifyMode !== null}
+        onOpenChange={(o) => !o && setVerifyMode(null)}
+        lines={orderLines}
+        mode={verifyMode ?? "picking"}
+        onConfirm={() => {
+          toast.success(
+            verifyMode === "shipping"
+              ? `Shipment verified & dispatched: ${order.deliveryNumber}`
+              : `Picking verified: ${order.deliveryNumber}`,
+          )
+          setVerifyMode(null)
+        }}
+      />
     </div>
   )
 }

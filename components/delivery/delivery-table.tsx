@@ -1,7 +1,20 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Search, Eye, Pencil, Printer, Flag, MapPin, MoreHorizontal, ArrowUpDown } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Search, Eye, Pencil, Printer, Flag, MapPin, MoreHorizontal, ArrowUpDown, Copy, XCircle, Trash2, Truck } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,8 +27,23 @@ import {
 } from "@/components/ui/table"
 import type { DeliveryOrder, DeliveryStatus } from "@/lib/delivery-types"
 import { deliveryStatusMap } from "@/lib/delivery-types"
-import { customerAvatarColors } from "@/lib/delivery-mock-data"
 import { cn } from "@/lib/utils"
+
+function getAvatarColor(name: string): string {
+  const palettes = [
+    "from-blue-400 to-blue-600",
+    "from-teal-400 to-teal-600",
+    "from-violet-400 to-violet-600",
+    "from-rose-400 to-rose-600",
+    "from-amber-400 to-amber-600",
+    "from-emerald-400 to-emerald-600",
+    "from-indigo-400 to-indigo-600",
+    "from-pink-400 to-pink-600",
+  ]
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return palettes[h % palettes.length]
+}
 
 const statusFilters: { value: DeliveryStatus | "all" | "pending_close"; label: string }[] = [
   { value: "all", label: "All" },
@@ -30,10 +58,83 @@ const statusFilters: { value: DeliveryStatus | "all" | "pending_close"; label: s
 interface DeliveryTableProps {
   data: DeliveryOrder[]
   onRowClick?: (id: string) => void
+  onStatusChange?: () => void
 }
 
-export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
+const DELIVERY_PAGE_SIZE = 15
+
+async function patchStatus(id: string, status: string) {
+  await fetch(`/api/delivery-orders/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  })
+}
+
+export function DeliveryTable({ data, onRowClick, onStatusChange }: DeliveryTableProps) {
+  const router = useRouter()
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; number: string } | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const handleDelete = async (id: string, number: string) => {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/delivery-orders/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        toast.success(`ลบ ${number} แล้ว`)
+        onStatusChange?.()
+        router.refresh()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setBusy(null)
+      setDeleteTarget(null)
+    }
+  }
+
+  const handleClone = async (id: string, number: string) => {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/delivery-orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clone" }),
+      })
+      if (res.ok) {
+        const { deliveryNumber } = await res.json()
+        toast.success(`Duplicate จาก ${number} → ${deliveryNumber}`)
+        onStatusChange?.()
+        router.refresh()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleCancel = async (id: string, number: string) => {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/delivery-orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" }),
+      })
+      if (res.ok) {
+        toast.success(`${number} ยกเลิกแล้ว`)
+        onStatusChange?.()
+        router.refresh()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<"deliveryDate" | "totalAmount" | null>(null)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
@@ -75,6 +176,9 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
 
     return result
   }, [data, search, statusFilter, sortField, sortDir])
+
+  const deliveryTotalPages = Math.max(1, Math.ceil(filtered.length / DELIVERY_PAGE_SIZE))
+  const paged = filtered.slice((page - 1) * DELIVERY_PAGE_SIZE, page * DELIVERY_PAGE_SIZE)
 
   const handleSort = (field: "deliveryDate" | "totalAmount") => {
     if (sortField === field) {
@@ -161,9 +265,9 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((row) => {
+              {paged.map((row) => {
                 const statusInfo = deliveryStatusMap[row.status]
-                const avatarColor = customerAvatarColors[row.customerName] || "from-gray-400 to-gray-600"
+                const avatarColor = getAvatarColor(row.customerName)
                 const overdue = isOverdue(row.deliveryDate, row.status)
                 return (
                   <TableRow
@@ -267,49 +371,75 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
                         >
                           <Eye className="h-3 w-3 text-muted-foreground" />
                         </button>
-                        {row.status === "shipped" && (
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary transition-all hover:border-primary hover:bg-primary/10"
-                            title="Track"
-                          >
-                            <MapPin className="h-3 w-3 text-muted-foreground" />
-                          </button>
-                        )}
-                        {(row.status === "draft" || row.status === "reserved" || row.status === "picking") && (
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary transition-all hover:border-primary hover:bg-primary/10"
-                            title="Edit"
-                          >
-                            <Pencil className="h-3 w-3 text-muted-foreground" />
-                          </button>
-                        )}
-                        {row.jobStatus === "pending_close" && (
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 transition-all hover:bg-emerald-500 hover:text-white"
-                            title="Close Job"
-                          >
-                            <Flag className="h-3 w-3" />
-                          </button>
-                        )}
                         <button
                           type="button"
                           className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary transition-all hover:border-primary hover:bg-primary/10"
                           title="Print"
+                          onClick={() => window.open(`/delivery/${row.id}/print`, "_blank")}
                         >
                           <Printer className="h-3 w-3 text-muted-foreground" />
                         </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary transition-all hover:border-primary hover:bg-primary/10"
+                            >
+                              <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => onRowClick?.(row.id)}>
+                              <Eye className="mr-2 h-3.5 w-3.5" /> View Detail
+                            </DropdownMenuItem>
+                            {(row.status === "draft" || row.status === "reserved" || row.status === "picking") && (
+                              <DropdownMenuItem onClick={() => onRowClick?.(row.id)}>
+                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem disabled={busy === row.id} onClick={() => handleClone(row.id, row.deliveryNumber)}>
+                              <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate
+                            </DropdownMenuItem>
+                            {row.status === "shipped" && (
+                              <DropdownMenuItem onClick={() => { if (row.trackingNumber) window.open(`https://track.example.com?q=${row.trackingNumber}`, "_blank"); else toast.info("ยังไม่มีเลข Tracking") }}>
+                                <MapPin className="mr-2 h-3.5 w-3.5" /> Track Shipment
+                              </DropdownMenuItem>
+                            )}
+                            {row.jobStatus === "pending_close" && (
+                              <DropdownMenuItem onClick={async () => {
+                                await patchStatus(row.id, "completed")
+                                toast.success(`${row.deliveryNumber} Job Closed`)
+                                onStatusChange?.()
+                              }}>
+                                <Flag className="mr-2 h-3.5 w-3.5" /> Close Job
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            {(row.status === "draft" || row.status === "reserved") && (
+                              <DropdownMenuItem className="text-amber-600 focus:text-amber-600" disabled={busy === row.id} onClick={() => handleCancel(row.id, row.deliveryNumber)}>
+                                <XCircle className="mr-2 h-3.5 w-3.5" /> Cancel
+                              </DropdownMenuItem>
+                            )}
+                            {row.status === "draft" && (
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={busy === row.id} onClick={() => setDeleteTarget({ id: row.id, number: row.deliveryNumber })}>
+                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
                 )
               })}
-              {filtered.length === 0 && (
+              {paged.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} className="py-12 text-center text-sm text-muted-foreground">
-                    No delivery orders found
+                  <TableCell colSpan={11} className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <Truck className="h-8 w-8 text-muted-foreground/30" />
+                      <p className="text-sm font-semibold text-muted-foreground">No delivery orders found</p>
+                      <p className="text-[11px] text-muted-foreground/70">{search ? `No results for "${search}"` : "Try changing your filters"}</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
@@ -320,24 +450,61 @@ export function DeliveryTable({ data, onRowClick }: DeliveryTableProps) {
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-border px-5 py-3">
           <span className="text-[12px] text-muted-foreground">
-            Showing {filtered.length} of {data.length} orders
+            Showing {Math.min((page - 1) * DELIVERY_PAGE_SIZE + 1, filtered.length)}-{Math.min(page * DELIVERY_PAGE_SIZE, filtered.length)} of {filtered.length} orders
           </span>
           <div className="flex gap-1">
-            {[1, 2, 3].map((p) => (
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary disabled:opacity-30"
+            >
+              <ArrowUpDown className="h-3 w-3 rotate-180" />
+            </button>
+            {Array.from({ length: Math.min(deliveryTotalPages, 5) }, (_, i) => i + 1).map((p) => (
               <button
                 key={p}
                 type="button"
+                onClick={() => setPage(p)}
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-semibold transition-all",
-                  p === 1 ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-secondary"
+                  p === page ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-secondary"
                 )}
               >
                 {p}
               </button>
             ))}
+            <button
+              type="button"
+              disabled={page >= deliveryTotalPages}
+              onClick={() => setPage(page + 1)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary disabled:opacity-30"
+            >
+              <ArrowUpDown className="h-3 w-3" />
+            </button>
           </div>
         </div>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบ Delivery Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ &quot;{deleteTarget?.number}&quot; อย่างถาวรใช่หรือไม่?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && handleDelete(deleteTarget.id, deleteTarget.number)}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
