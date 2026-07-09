@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import useSWR from "swr"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,13 +11,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog"
 import {
   ChevronDown, ChevronUp, Check, Plus, Zap, Target, CheckCircle,
   AlertTriangle, BarChart3, Percent, Package, Pencil, Trash2, Loader2, ListPlus,
+  PackageCheck, Trophy,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { JobOrder, ProductionStep, TrackingStats, DailyRecord } from "@/lib/job-order-types"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 interface Props {
   jobOrder: JobOrder
@@ -29,9 +34,11 @@ const OPERATORS = ["K. Somsri", "K. Wichai", "K. Somchai", "K. Malee", "K. Anan"
 export function DailyTrackingTab({ jobOrder, stats, onRefresh }: Props) {
   const steps = jobOrder.productionSteps
   const currentStep = steps.find((s) => s.status === "active")
+  const allStepsDone = steps.length > 0 && steps.every((s) => s.status === "done")
   const [busy, setBusy] = useState(false)
   const [addStepOpen, setAddStepOpen] = useState(false)
   const [editStep, setEditStep] = useState<ProductionStep | null>(null)
+  const [finishOpen, setFinishOpen] = useState(false)
 
   const refresh = () => onRefresh?.()
 
@@ -121,6 +128,24 @@ export function DailyTrackingTab({ jobOrder, stats, onRefresh }: Props) {
         ))}
       </div>
 
+      {/* All-steps-done banner */}
+      {allStepsDone && jobOrder.status !== "delivered" && (
+        <div className="mt-4 flex items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+          <Trophy className="h-8 w-8 shrink-0 text-emerald-600" />
+          <div className="flex-1">
+            <p className="text-sm font-extrabold text-emerald-900">ทุกขั้นตอนเสร็จสมบูรณ์</p>
+            <p className="text-[12px] text-emerald-700">ย้าย FG เข้าสต็อกสินค้าสำเร็จรูปเพื่อปิด Job Order</p>
+          </div>
+          <Button
+            className="shrink-0 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+            onClick={() => setFinishOpen(true)}
+          >
+            <PackageCheck className="h-4 w-4" />
+            ย้าย FG เข้าสต็อก
+          </Button>
+        </div>
+      )}
+
       {/* Add / Edit dialogs */}
       <StepFormDialog
         mode="add"
@@ -136,6 +161,14 @@ export function DailyTrackingTab({ jobOrder, stats, onRefresh }: Props) {
         jobOrder={jobOrder}
         step={editStep ?? undefined}
         onSaved={refresh}
+      />
+
+      {/* Move to FG Stock dialog */}
+      <MoveToFGDialog
+        open={finishOpen}
+        onOpenChange={setFinishOpen}
+        jobOrder={jobOrder}
+        onFinished={refresh}
       />
     </div>
   )
@@ -504,6 +537,178 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{label}</label>
       {children}
     </div>
+  )
+}
+
+// ── Move to FG Stock dialog ───────────────────────────────────────────────────
+interface MoveToFGDialogProps {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  jobOrder: JobOrder
+  onFinished: () => void
+}
+
+function MoveToFGDialog({ open, onOpenChange, jobOrder, onFinished }: MoveToFGDialogProps) {
+  const { data } = useSWR(
+    open ? "/api/stock/cards?type=finished_good&limit=200" : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  )
+  const fgCards: { id: string; itemCode: string; itemName: string }[] = data?.cards ?? []
+
+  const [selectedCard, setSelectedCard] = useState("")
+  const [quantity, setQuantity] = useState(String(jobOrder.quantity))
+  const [lotNumber, setLotNumber] = useState("")
+  const [notes, setNotes] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState("")
+
+  const filtered = fgCards.filter(
+    (c) =>
+      search === "" ||
+      c.itemCode.toLowerCase().includes(search.toLowerCase()) ||
+      c.itemName.toLowerCase().includes(search.toLowerCase())
+  )
+
+  async function handleSubmit() {
+    if (!selectedCard) { toast.error("เลือก FG stock card ก่อน"); return }
+    const qty = Number(quantity)
+    if (!qty || qty <= 0) { toast.error("กรอกจำนวนที่ถูกต้อง"); return }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/job-orders/${jobOrder.id}/finish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stockCardId: selectedCard, quantity: qty, lotNumber, notes }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed")
+      toast.success("ย้าย FG เข้าสต็อกเรียบร้อย", {
+        description: `JO #${jobOrder.orderNumber} ปิดแล้ว`,
+      })
+      onOpenChange(false)
+      onFinished()
+    } catch (e) {
+      toast.error("เกิดข้อผิดพลาด", { description: String(e) })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PackageCheck className="h-5 w-5 text-emerald-600" />
+            ย้าย FG เข้าสต็อก — JO #{jobOrder.orderNumber}
+          </DialogTitle>
+          <DialogDescription className="text-[12px]">
+            เลือก stock card ของสินค้าสำเร็จรูปและระบุจำนวนที่ผลิตได้จาก Job Order นี้
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-1">
+          {/* FG stock card search + select */}
+          <div>
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              ค้นหา FG Stock Card
+            </label>
+            <Input
+              placeholder="ค้นหา code หรือชื่อสินค้า..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 text-[12px] mb-2"
+            />
+            <div className="max-h-44 overflow-y-auto rounded-xl border border-border bg-card">
+              {fgCards.length === 0 ? (
+                <div className="flex items-center justify-center py-6 text-[12px] text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> กำลังโหลด...
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="py-4 text-center text-[12px] text-muted-foreground">ไม่พบ FG ที่ตรงกัน</div>
+              ) : (
+                filtered.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedCard(c.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 border-b border-border px-3 py-2.5 text-left last:border-b-0 transition-colors hover:bg-secondary/50",
+                      selectedCard === c.id && "bg-emerald-50 hover:bg-emerald-50"
+                    )}
+                  >
+                    <div className={cn(
+                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
+                      selectedCard === c.id ? "border-emerald-600 bg-emerald-600" : "border-border bg-card"
+                    )}>
+                      {selectedCard === c.id && <Check className="h-3 w-3 text-white" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-mono text-[11px] font-bold text-primary">{c.itemCode}</div>
+                      <div className="truncate text-[11px] text-foreground">{c.itemName}</div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Quantity */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                จำนวน (units) *
+              </label>
+              <Input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="h-9 text-[12px]"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Lot Number
+              </label>
+              <Input
+                placeholder="เช่น LOT-2025-001"
+                value={lotNumber}
+                onChange={(e) => setLotNumber(e.target.value)}
+                className="h-9 text-[12px]"
+              />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              หมายเหตุ
+            </label>
+            <Input
+              placeholder={`Finished from JO #${jobOrder.orderNumber}`}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="h-9 text-[12px]"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            ยกเลิก
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={saving || !selectedCard}
+            className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />}
+            ยืนยัน — ย้าย FG เข้าสต็อก
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

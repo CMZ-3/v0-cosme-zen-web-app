@@ -3,12 +3,13 @@
 import { useState } from "react"
 import {
   Settings, Building2, Users, Bell, ShieldCheck, Palette, ChevronRight, ChevronDown,
-  Save, Check,
+  Save, Check, UserPlus, X, Loader2, Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -311,7 +312,9 @@ function AppearanceForm() {
 }
 
 // ─── Users & Roles ────────────────────────────────────────────────────────────
-const MOCK_USERS = [
+type UserEntry = { name: string; email: string; role: string; status: "active" | "inactive" }
+
+const INIT_USERS: UserEntry[] = [
   { name: "Admin User", email: "admin@cosmezen.co.th", role: "Admin", status: "active" },
   { name: "Production Manager", email: "prod@cosmezen.co.th", role: "Production", status: "active" },
   { name: "QC Officer", email: "qc@cosmezen.co.th", role: "QC", status: "active" },
@@ -325,10 +328,58 @@ const ROLE_COLORS: Record<string, string> = {
   Stock: "bg-amber-100 text-amber-700",
 }
 
+const ROLES = ["Admin", "Production", "QC", "Stock", "Finance", "Sales"]
+
 function UsersSection() {
+  const [users, setUsers] = useState<UserEntry[]>(INIT_USERS)
+  const [showInvite, setShowInvite] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteName, setInviteName] = useState("")
+  const [inviteRole, setInviteRole] = useState("Production")
+  const [inviting, setInviting] = useState(false)
+
+  async function handleInvite() {
+    if (!inviteEmail.trim() || !inviteName.trim()) {
+      toast.error("กรุณากรอกชื่อและอีเมล")
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail)) {
+      toast.error("รูปแบบอีเมลไม่ถูกต้อง")
+      return
+    }
+    if (users.some((u) => u.email === inviteEmail.trim())) {
+      toast.error("อีเมลนี้มีในระบบแล้ว")
+      return
+    }
+    setInviting(true)
+    // Simulate API call delay
+    await new Promise((r) => setTimeout(r, 800))
+    const newUser: UserEntry = { name: inviteName.trim(), email: inviteEmail.trim(), role: inviteRole, status: "inactive" }
+    setUsers((prev) => [...prev, newUser])
+    setInviting(false)
+    setShowInvite(false)
+    setInviteEmail("")
+    setInviteName("")
+    setInviteRole("Production")
+    toast.success(`ส่งคำเชิญไปยัง ${newUser.email} แล้ว`)
+  }
+
+  function handleToggleStatus(email: string) {
+    setUsers((prev) =>
+      prev.map((u) => u.email === email ? { ...u, status: u.status === "active" ? "inactive" : "active" } : u)
+    )
+    const u = users.find((u) => u.email === email)
+    toast.success(u?.status === "active" ? "Deactivated user" : "Activated user")
+  }
+
+  function handleRemove(email: string) {
+    setUsers((prev) => prev.filter((u) => u.email !== email))
+    toast.success("ลบผู้ใช้แล้ว")
+  }
+
   return (
     <div className="space-y-2">
-      {MOCK_USERS.map((u) => (
+      {users.map((u) => (
         <div key={u.email} className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-[12px] font-bold text-muted-foreground">
             {u.name[0]}
@@ -340,16 +391,83 @@ function UsersSection() {
           <span className={cn("rounded-md px-2 py-0.5 text-[10px] font-bold", ROLE_COLORS[u.role] ?? "bg-secondary text-muted-foreground")}>
             {u.role}
           </span>
-          <span className={cn("rounded-full px-2 py-0.5 text-[9px] font-bold", u.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground")}>
+          <button
+            className={cn("rounded-full px-2 py-0.5 text-[9px] font-bold transition-opacity hover:opacity-70", u.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground")}
+            onClick={() => handleToggleStatus(u.email)}
+          >
             {u.status}
-          </span>
+          </button>
+          <button
+            className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-red-50 text-muted-foreground hover:text-red-500"
+            onClick={() => handleRemove(u.email)}
+            aria-label="Remove user"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
         </div>
       ))}
       <div className="flex justify-end pt-2">
-        <Button variant="outline" size="sm" className="gap-1.5 rounded-xl text-[12px]" onClick={() => toast.info("User management coming soon")}>
-          Invite User
+        <Button size="sm" className="gap-1.5 rounded-xl text-[12px]" onClick={() => setShowInvite(true)}>
+          <UserPlus className="h-3.5 w-3.5" /> Invite User
         </Button>
       </div>
+
+      {/* Invite overlay */}
+      {showInvite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowInvite(false)}>
+          <div className="w-full max-w-sm rounded-2xl bg-card p-5 shadow-xl border border-border" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-sm font-extrabold text-foreground">Invite Team Member</p>
+              <button className="rounded-full p-1 hover:bg-secondary" onClick={() => setShowInvite(false)}>
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase text-muted-foreground">Full Name *</label>
+                <Input
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                  placeholder="เช่น Somchai Jaidee"
+                  className="h-9 text-[12px]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase text-muted-foreground">Email *</label>
+                <Input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="user@cosmezen.co.th"
+                  className="h-9 text-[12px]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase text-muted-foreground">Role</label>
+                <Select value={inviteRole} onValueChange={setInviteRole}>
+                  <SelectTrigger className="h-9 text-[12px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r} value={r} className="text-[12px]">{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" className="gap-1 text-[11px]" onClick={() => setShowInvite(false)}>
+                ยกเลิก
+              </Button>
+              <Button size="sm" className="gap-1 text-[11px]" onClick={handleInvite} disabled={inviting}>
+                {inviting ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
+                {inviting ? "กำลังส่ง..." : "Send Invite"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

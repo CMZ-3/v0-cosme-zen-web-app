@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getJobOrder, updateJobOrderStatus, deleteJobOrder, cloneJobOrder, updateJobOrder } from "@/lib/db/job-order-queries"
+import { getJobOrder, updateJobOrderStatus, deleteJobOrder, cloneJobOrder, updateJobOrder, addQCResult } from "@/lib/db/job-order-queries"
 import type { JOStatus } from "@/lib/job-order-types"
 
 export const dynamic = "force-dynamic"
@@ -33,6 +33,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return ok
         ? NextResponse.json({ ok: true })
         : NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    if (body.action === "add_qc_result") {
+      const { parameter, specification, result, status: qcStatus, tester } = body
+      if (!parameter || !result) return NextResponse.json({ error: "parameter and result required" }, { status: 400 })
+      const entry = {
+        id: `qc-${id}-${Date.now()}`,
+        parameter,
+        specification: specification ?? "",
+        result,
+        status: qcStatus ?? "pending",
+        tester: tester ?? "Admin",
+        testedAt: new Date().toISOString(),
+      }
+      const ok = await addQCResult(id, entry)
+      return ok ? NextResponse.json({ ok: true, entry }) : NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
     // Default: status change

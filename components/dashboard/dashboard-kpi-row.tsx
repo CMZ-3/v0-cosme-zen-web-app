@@ -47,6 +47,25 @@ function KpiCard({ label, value, sub, icon: Icon, color, bgColor, trend }: KpiCa
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function DashboardKpiRow({ liveData }: { liveData?: any }) {
+  const isLoading = !liveData
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[0, 1, 2, 3].map((i) => (
+          <Card key={i} className="flex items-center gap-4 px-5 py-4 border border-border shadow-none">
+            <div className="h-11 w-11 shrink-0 rounded-xl bg-secondary animate-pulse" />
+            <div className="flex-1 space-y-2">
+              <div className="h-2.5 w-24 rounded-full bg-secondary animate-pulse" />
+              <div className="h-6 w-16 rounded-full bg-secondary animate-pulse" />
+              <div className="h-2 w-20 rounded-full bg-secondary animate-pulse" />
+            </div>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
   const kpis = useMemo<KpiCardProps[]>(() => {
     const k = liveData?.kpi
     const activeJo = k?.activeJo ?? 0

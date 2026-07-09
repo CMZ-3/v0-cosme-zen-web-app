@@ -144,7 +144,12 @@ export async function GET(req: Request) {
       await seedProducts()
       return NextResponse.json({ ok: true, seeded: { products: mockProducts.length } })
     }
-    return NextResponse.json({ ok: false, error: "Use ?part=formulas|link|delivery|customers|suppliers|fda|products" }, { status: 400 })
+    if (part === "stock") {
+      // Seed opening-balance movements without touching stock cards
+      const count = await seedStockMovements()
+      return NextResponse.json({ ok: true, seeded: { stockMovements: count } })
+    }
+    return NextResponse.json({ ok: false, error: "Use ?part=formulas|link|delivery|customers|suppliers|fda|products|stock" }, { status: 400 })
   } catch (err) {
     console.error("[v0] seed GET error:", err)
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
@@ -469,4 +474,37 @@ async function linkFormulaIngredients() {
   }
 
   return { total: ingredients.length, matched, unmatched }
+}
+
+async function seedStockMovements() {
+  // Upsert opening-balance movements from the current stock cards
+  const cards = await db
+    .select({ id: stockCards.id, itemCode: stockCards.itemCode, itemName: stockCards.itemName, balance: stockCards.balance, unitCost: stockCards.unitCost })
+    .from(stockCards)
+
+  const movementRows = cards
+    .filter((c) => (c.balance ?? 0) > 0)
+    .map((c, idx) => ({
+      id: `seed-open-${String(idx + 1).padStart(5, "0")}`,
+      referenceNumber: `OPEN-${String(idx + 1).padStart(4, "0")}`,
+      movementType: "buy_in",
+      stockCardId: c.id,
+      itemCode: c.itemCode,
+      itemName: c.itemName,
+      quantity: c.balance ?? 0,
+      unitCost: c.unitCost ?? 0,
+      totalCost: (c.unitCost ?? 0) * (c.balance ?? 0),
+      status: "approved",
+      notes: "ยอดยกมา (นำเข้าจากไฟล์ StockCards)",
+      createdBy: "seed",
+    }))
+
+  if (movementRows.length === 0) return 0
+
+  // Delete old seed movements and re-insert
+  await db.delete(stockMovements)
+  for (let i = 0; i < movementRows.length; i += 100) {
+    await db.insert(stockMovements).values(movementRows.slice(i, i + 100))
+  }
+  return movementRows.length
 }
