@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { listFdaRegistrations, getFdaKPI, createFdaRegistration } from "@/lib/db/fda-product-queries"
+import { listFdaRegistrations, getFdaKPI, createFdaRegistration, updateFdaStatus } from "@/lib/db/fda-product-queries"
 
 export async function GET(req: Request) {
   try {
@@ -70,6 +70,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ registration: row }, { status: 201 })
   } catch (err) {
     console.error("[v0] POST /api/fda error:", err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
+}
+
+// Bulk status update — used by "Submit All Selected" on FDA table
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json()
+    const ids: string[] = body.ids ?? []
+    const status: string = body.status ?? "submitted"
+    if (!ids.length) {
+      return NextResponse.json({ error: "ids required" }, { status: 400 })
+    }
+    const results = await Promise.all(
+      ids.map((id) => updateFdaStatus(id, status as Parameters<typeof updateFdaStatus>[1]))
+    )
+    const updated = results.filter(Boolean).length
+    return NextResponse.json({ ok: true, updated })
+  } catch (err) {
+    console.error("[v0] PATCH /api/fda error:", err)
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }

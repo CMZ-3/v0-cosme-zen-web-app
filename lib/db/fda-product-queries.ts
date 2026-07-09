@@ -193,7 +193,7 @@ export async function cloneFdaRegistration(id: string): Promise<FdaRegistrationR
   return inserted[0]
 }
 
-// ─── PIF sub-table mutations ──────────────────────────────────────────────
+// ─── PIF sub-table mutations ─────────────────────��────────────────────────
 
 export async function addFdaIngredient(data: Omit<import("@/lib/fda-types").FdaIngredient, "id">): Promise<import("@/lib/fda-types").FdaIngredient> {
   const { nanoid } = await import("nanoid")
@@ -201,7 +201,10 @@ export async function addFdaIngredient(data: Omit<import("@/lib/fda-types").FdaI
   return rows[0] as unknown as import("@/lib/fda-types").FdaIngredient
 }
 
-export async function updateFdaIngredient(id: string, data: Partial<FdaIngredient>): Promise<boolean> {
+export async function updateFdaIngredient(
+  id: string,
+  data: Partial<typeof fdaIngredients.$inferInsert>
+): Promise<boolean> {
   const rows = await db.update(fdaIngredients).set(data).where(eq(fdaIngredients.id, id)).returning()
   return rows.length > 0
 }
@@ -217,7 +220,10 @@ export async function addFdaManufacturingStep(data: Omit<FdaManufacturingStep, "
   return rows[0] as unknown as FdaManufacturingStep
 }
 
-export async function updateFdaManufacturingStep(id: string, data: Partial<FdaManufacturingStep>): Promise<boolean> {
+export async function updateFdaManufacturingStep(
+  id: string,
+  data: Partial<typeof fdaManufacturingSteps.$inferInsert>
+): Promise<boolean> {
   const rows = await db.update(fdaManufacturingSteps).set(data).where(eq(fdaManufacturingSteps.id, id)).returning()
   return rows.length > 0
 }
@@ -233,7 +239,10 @@ export async function addFdaRawMaterialSpec(data: Omit<FdaRawMaterialSpec, "id">
   return rows[0] as unknown as FdaRawMaterialSpec
 }
 
-export async function updateFdaRawMaterialSpec(id: string, data: Partial<FdaRawMaterialSpec>): Promise<boolean> {
+export async function updateFdaRawMaterialSpec(
+  id: string,
+  data: Partial<typeof fdaRawMaterialSpecs.$inferInsert>
+): Promise<boolean> {
   const rows = await db.update(fdaRawMaterialSpecs).set(data).where(eq(fdaRawMaterialSpecs.id, id)).returning()
   return rows.length > 0
 }
