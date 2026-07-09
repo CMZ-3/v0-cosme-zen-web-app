@@ -307,6 +307,7 @@ export const JOB_ORDER_ROWS = [
     actualStart: "2025-03-01",
     actualEnd: "2025-03-03",
     assignedTo: "ทีม A",
+    costBreakdown: { rawMaterial: 15000, packaging: 5000, labor: 5000, overhead: 3000, total: 25000 },
   },
   {
     id: "JO-002",
@@ -325,6 +326,7 @@ export const JOB_ORDER_ROWS = [
     actualStart: "2025-03-05",
     actualEnd: "2025-03-06",
     assignedTo: "ทีม B",
+    costBreakdown: { rawMaterial: 9000, packaging: 3000, labor: 3000, overhead: 1800, total: 15000 },
   },
   {
     id: "JO-003",
@@ -342,6 +344,7 @@ export const JOB_ORDER_ROWS = [
     plannedEnd: "2025-07-03",
     actualStart: "2025-07-01",
     assignedTo: "ทีม A",
+    costBreakdown: { rawMaterial: 6000, packaging: 2000, labor: 2000, overhead: 1200, total: 10000 },
   },
   {
     id: "JO-004",
@@ -358,6 +361,7 @@ export const JOB_ORDER_ROWS = [
     plannedStart: "2025-07-08",
     plannedEnd: "2025-07-10",
     assignedTo: "ทีม B",
+    costBreakdown: { rawMaterial: 6000, packaging: 2000, labor: 2000, overhead: 1200, total: 10000 },
   },
   {
     id: "JO-005",
@@ -374,5 +378,6 @@ export const JOB_ORDER_ROWS = [
     plannedStart: "2025-07-10",
     plannedEnd: "2025-07-12",
     assignedTo: "ทีม A",
+    costBreakdown: { rawMaterial: 12000, packaging: 4000, labor: 4000, overhead: 2400, total: 20000 },
   },
 ]

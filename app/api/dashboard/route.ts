@@ -14,29 +14,42 @@ export async function GET() {
     ])
 
     // ── Job Order KPIs ──────────────────────────────────────────
+    // DB status values: pending | in_progress | qc | completed | cancelled
     const DONE_STATUSES = ["completed", "cancelled"]
     const ACTIVE_JO = joRows.filter((j) => !DONE_STATUSES.includes(j.status ?? ""))
     const inProduction = joRows.filter((j) =>
       ["in_progress", "qc"].includes(j.status ?? "")
     ).length
 
-    // costBreakdown.total used for revenue proxy (no separate totalValue column)
+    // Revenue = costBreakdown.total (now seeded with real values).
+    // Fall back to batchSizeKg * 500 estimate if breakdown is missing.
     const totalRevenue = joRows.reduce((s, j) => {
       const cb = j.costBreakdown as Record<string, number> | null
-      return s + (cb?.total ?? 0)
+      const fromBreakdown = cb?.total ?? 0
+      return s + (fromBreakdown > 0 ? fromBreakdown : (Number(j.batchSizeKg) || 0) * 500)
     }, 0)
-    const totalCost = totalRevenue * 0.7 // estimated 70% COGS — no dedicated cost column yet
+    const totalCost = totalRevenue * 0.65   // ~65% COGS estimate
     const grossProfit = totalRevenue - totalCost
     const margin = totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 100) : 0
 
-    // Pipeline counts per status (using schema status values)
-    const JO_STATUSES = ["pending", "in_progress", "qc", "completed", "cancelled"]
-    const joPipeline: Record<string, number> = {}
-    for (const st of JO_STATUSES) {
-      joPipeline[st] = joRows.filter((j) => j.status === st).length
+    // Pipeline counts — use DB status values
+    // Map to the display statuses the production-pipeline component expects
+    const STATUS_MAP: Record<string, string> = {
+      pending: "new",
+      in_progress: "in_production",
+      qc: "qc",
+      completed: "delivered",
+      cancelled: "cancelled",
+    }
+    const joPipeline: Record<string, number> = {
+      new: 0, preparing_rm: 0, in_production: 0, qc: 0, packing: 0, delivered: 0,
+    }
+    for (const j of joRows) {
+      const mapped = STATUS_MAP[j.status ?? ""] ?? "new"
+      if (mapped in joPipeline) joPipeline[mapped]++
     }
 
-    // Recent active JOs (latest first)
+    // Recent active JOs (latest first) — use correct DB column names
     const recentJos = [...joRows]
       .filter((j) => !DONE_STATUSES.includes(j.status ?? ""))
       .sort((a, b) => {
@@ -47,13 +60,13 @@ export async function GET() {
       .slice(0, 4)
       .map((j) => ({
         id: j.id,
-        orderNumber: j.jobNo,                // jobNo = order number
-        productName: j.formulaName,          // formulaName = product being made
-        customerName: j.customer ?? "—",     // customer column
-        brandName: "",                       // no brand column in schema
-        status: j.status,
-        priority: j.priority,
-        dueDate: j.plannedEnd ?? null,       // plannedEnd = due date
+        orderNumber: j.jobNo,              // DB col: jobNo
+        productName: j.formulaName,        // DB col: formulaName
+        customerName: j.customer ?? "—",   // DB col: customer
+        brandName: "",
+        status: STATUS_MAP[j.status ?? ""] ?? j.status,
+        priority: j.priority === "normal" ? "medium" : (j.priority ?? "medium"),
+        dueDate: j.plannedEnd ?? null,     // DB col: plannedEnd
         batchSize: j.batchSizeKg,
       }))
 
@@ -94,9 +107,9 @@ export async function GET() {
           deadlines.push({
             id: `jo-${j.id}`,
             type: "job",
-            label: j.jobNo,
+            label: j.jobNo,                            // DB col: jobNo
             detail: `${j.customer ?? ""} - ${j.formulaName}`.trim(),
-            date: j.plannedEnd!,
+            date: j.plannedEnd!,                       // DB col: plannedEnd
             daysLeft: dl,
           })
         }
@@ -127,11 +140,12 @@ export async function GET() {
     }> = []
 
     joRows.forEach((j) => {
+      const statusLabel = STATUS_MAP[j.status ?? ""] ?? j.status ?? ""
       activityItems.push({
         id: `jo-${j.id}`,
         module: "Job Orders",
-        title: `${j.jobNo} ${j.status}`,
-        description: `${j.customer ?? ""} - ${j.formulaName} (${j.batchSizeKg} kg)`,
+        title: `${j.jobNo} — ${statusLabel}`,
+        description: `${j.customer ?? ""} — ${j.formulaName} (${j.batchSizeKg} kg)`.replace(/^— /, ""),
         sortDate: j.updatedAt ? String(j.updatedAt) : String(j.createdAt ?? ""),
       })
     })
