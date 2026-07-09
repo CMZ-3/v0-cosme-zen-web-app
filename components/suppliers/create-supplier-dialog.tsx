@@ -16,6 +16,7 @@ import { Truck } from "lucide-react"
 interface CreateSupplierDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCreated?: () => void
 }
 
 const supplierTypes = [
@@ -26,7 +27,7 @@ const supplierTypes = [
   { label: "Other", value: "other" },
 ]
 
-export function CreateSupplierDialog({ open, onOpenChange }: CreateSupplierDialogProps) {
+export function CreateSupplierDialog({ open, onOpenChange, onCreated }: CreateSupplierDialogProps) {
   const [formData, setFormData] = useState({
     supplier_name: "",
     supplier_name_en: "",
@@ -51,10 +52,35 @@ export function CreateSupplierDialog({ open, onOpenChange }: CreateSupplierDialo
 
   const update = (key: string, value: string) => setFormData(prev => ({ ...prev, [key]: value }))
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In production, this would call the API
-    onOpenChange(false)
+    try {
+      await fetch("/api/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplierName: formData.supplier_name,
+          supplierNameEn: formData.supplier_name_en || null,
+          supplierType: formData.supplier_type,
+          contactPerson: formData.contact_person || null,
+          email: formData.email || null,
+          phone: formData.phone || null,
+          website: formData.website || null,
+          description: formData.description || null,
+          address: formData.address || null,
+          city: formData.city || null,
+          country: formData.country || "Thailand",
+          taxId: formData.tax_id || null,
+          paymentTerms: formData.payment_terms || null,
+          paymentDays: formData.payment_days ? Number(formData.payment_days) : 30,
+          notes: formData.notes || null,
+        }),
+      })
+      onOpenChange(false)
+      onCreated?.()
+    } catch (err) {
+      console.error("[v0] createSupplier error:", err)
+    }
   }
 
   return (

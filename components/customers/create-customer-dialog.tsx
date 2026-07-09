@@ -13,10 +13,12 @@ import { Building, User, DollarSign, MapPin, FileText } from "lucide-react"
 interface CreateCustomerDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCreated?: () => void
 }
 
-export function CreateCustomerDialog({ open, onOpenChange }: CreateCustomerDialogProps) {
+export function CreateCustomerDialog({ open, onOpenChange, onCreated }: CreateCustomerDialogProps) {
   const [step, setStep] = useState(0)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const steps = [
     { label: "Company", icon: Building },
@@ -29,6 +31,34 @@ export function CreateCustomerDialog({ open, onOpenChange }: CreateCustomerDialo
   const handleClose = () => {
     onOpenChange(false)
     setTimeout(() => setStep(0), 200)
+  }
+
+  const handleSubmit = async (formData: FormData) => {
+    setIsSubmitting(true)
+    try {
+      await fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: formData.get("customerName"),
+          customerNameEn: formData.get("customerNameEn") || null,
+          customerType: formData.get("customerType") || "juristic",
+          businessType: formData.get("businessType") || "brand_owner",
+          contactPerson: formData.get("contactPerson") || null,
+          email: formData.get("email") || null,
+          phone: formData.get("phone") || null,
+          province: formData.get("province") || null,
+          country: formData.get("country") || "Thailand",
+          creditLimit: formData.get("creditLimit") ? Number(formData.get("creditLimit")) : null,
+          creditDays: formData.get("creditDays") ? Number(formData.get("creditDays")) : 30,
+          notes: formData.get("notes") || null,
+        }),
+      })
+      handleClose()
+      onCreated?.()
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -65,13 +95,14 @@ export function CreateCustomerDialog({ open, onOpenChange }: CreateCustomerDialo
           </div>
         </DialogHeader>
 
+        <form id="create-customer-form" onSubmit={(e) => e.preventDefault()}>
         <div className="px-6 py-5 max-h-[55vh] overflow-y-auto">
           {/* Step 0: Company */}
           {step === 0 && (
             <div className="space-y-4">
               <SectionTitle>Company Information</SectionTitle>
               <FormRow label="Company Name *">
-                <Input placeholder="e.g. Glow Lab Co., Ltd." />
+                <Input name="customerName" placeholder="e.g. Glow Lab Co., Ltd." />
               </FormRow>
               <FormRow label="English Name">
                 <Input placeholder="English name (optional)" />
@@ -212,6 +243,7 @@ export function CreateCustomerDialog({ open, onOpenChange }: CreateCustomerDialo
             </div>
           )}
         </div>
+        </form>
 
         <DialogFooter className="px-6 py-4 border-t border-border bg-secondary/30">
           <div className="flex w-full items-center justify-between">
@@ -227,8 +259,16 @@ export function CreateCustomerDialog({ open, onOpenChange }: CreateCustomerDialo
                   Next
                 </Button>
               ) : (
-                <Button size="sm" className="text-[12px]" onClick={handleClose}>
-                  Create Customer
+                <Button
+                  size="sm"
+                  className="text-[12px]"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    const form = document.getElementById("create-customer-form") as HTMLFormElement | null
+                    if (form) handleSubmit(new FormData(form))
+                  }}
+                >
+                  {isSubmitting ? "Creating..." : "Create Customer"}
                 </Button>
               )}
             </div>

@@ -224,6 +224,82 @@ export const simWorkflow = pgTable("sim_workflow", {
   updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
 })
 
+// ============================================================
+// Customers table
+// ============================================================
+export const customers = pgTable("customers", {
+  id: text("id").primaryKey(),
+  customerCode: text("customerCode").notNull(),
+  customerName: text("customerName").notNull(),
+  customerNameEn: text("customerNameEn"),
+  customerType: text("customerType").notNull().default("juristic"),
+  customerTier: text("customerTier").notNull().default("standard"),
+  businessType: text("businessType").notNull().default("brand_owner"),
+  contactPerson: text("contactPerson"),
+  email: text("email"),
+  phone: text("phone"),
+  creditLimit: doublePrecision("creditLimit"),
+  creditUsed: doublePrecision("creditUsed"),
+  isActive: boolean("isActive").notNull().default(true),
+  totalOrders: integer("totalOrders").notNull().default(0),
+  totalRevenue: doublePrecision("totalRevenue").notNull().default(0),
+  productCount: integer("productCount").notNull().default(0),
+  brandCount: integer("brandCount").notNull().default(0),
+  leadSource: text("leadSource"),
+  province: text("province"),
+  country: text("country").notNull().default("Thailand"),
+  address: text("address"),
+  city: text("city"),
+  postalCode: text("postalCode"),
+  taxId: text("taxId"),
+  creditDays: integer("creditDays").notNull().default(30),
+  salesRepresentative: text("salesRepresentative"),
+  website: text("website"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
+// ============================================================
+// Suppliers table
+// ============================================================
+export const suppliers = pgTable("suppliers", {
+  id: text("id").primaryKey(),
+  supplierCode: text("supplierCode").notNull(),
+  supplierName: text("supplierName").notNull(),
+  supplierNameEn: text("supplierNameEn"),
+  supplierType: text("supplierType").notNull().default("raw_material"),
+  country: text("country").notNull().default("Thailand"),
+  city: text("city"),
+  contactPerson: text("contactPerson"),
+  email: text("email"),
+  phone: text("phone"),
+  isActive: boolean("isActive").notNull().default(true),
+  isApproved: boolean("isApproved").notNull().default(false),
+  grade: text("grade").notNull().default("B"),
+  qualityRating: doublePrecision("qualityRating"),
+  deliveryRating: doublePrecision("deliveryRating"),
+  priceRating: doublePrecision("priceRating"),
+  materialTags: jsonb("materialTags").notNull().default([]),
+  status: text("status").notNull().default("active"),
+  description: text("description"),
+  address: text("address"),
+  taxId: text("taxId"),
+  paymentTerms: text("paymentTerms"),
+  paymentDays: integer("paymentDays").notNull().default(30),
+  website: text("website"),
+  notes: text("notes"),
+  avgLeadTimeDays: integer("avgLeadTimeDays"),
+  ytdOrderValue: doublePrecision("ytdOrderValue"),
+  moq: text("moq"),
+  onTimeDeliveryPct: doublePrecision("onTimeDeliveryPct"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type CustomerRow = typeof customers.$inferSelect
+export type SupplierRow = typeof suppliers.$inferSelect
+
 export type FormulaRow = typeof formulas.$inferSelect
 export type FormulaIngredientRow = typeof formulaIngredients.$inferSelect
 export type JobOrderRow = typeof jobOrders.$inferSelect

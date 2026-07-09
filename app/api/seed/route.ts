@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { stockCards, stockLots, stockMovements, stockReservations, simWorkflow, formulas, formulaIngredients, jobOrders, deliveryOrders } from "@/lib/db/schema"
+import { stockCards, stockLots, stockMovements, stockReservations, simWorkflow, formulas, formulaIngredients, jobOrders, deliveryOrders, customers, suppliers } from "@/lib/db/schema"
 import { INIT_STOCK, INIT_POS, INIT_JOBS, INIT_MOVEMENTS } from "@/lib/stock-simulation-store"
 import { stockItemToCardValues } from "@/lib/db/sim-mapping"
 import { NEW_STOCK_CARDS, FORMULA_ROWS, INGREDIENT_ROWS, JOB_ORDER_ROWS } from "@/lib/db/formula-seed-data"
 import { mockDeliveryOrders } from "@/lib/delivery-mock-data"
+import { mockCustomerList } from "@/lib/customer-mock-data"
+import { mockSupplierList } from "@/lib/supplier-mock-data"
 import type { StockItem } from "@/lib/stock-types"
 
 // Reset + seed the unified stock catalog. This REPLACES all stock rows with the
@@ -70,9 +72,11 @@ export async function POST(req: Request) {
       })
     })
 
-    // Seed formula + delivery modules on full reset.
+    // Seed formula + delivery + customers + suppliers on full reset.
     await seedFormulas()
     await seedDelivery()
+    await seedCustomers()
+    await seedSuppliers()
 
     return NextResponse.json({
       ok: true,
@@ -84,6 +88,8 @@ export async function POST(req: Request) {
         formulaIngredients: INGREDIENT_ROWS.length,
         jobOrders: JOB_ORDER_ROWS.length,
         deliveryOrders: mockDeliveryOrders.length,
+        customers: mockCustomerList.length,
+        suppliers: mockSupplierList.length,
       },
     })
   } catch (err) {
@@ -109,11 +115,92 @@ export async function GET(req: Request) {
       await seedDelivery()
       return NextResponse.json({ ok: true, seeded: { deliveryOrders: mockDeliveryOrders.length } })
     }
-    return NextResponse.json({ ok: false, error: "Use ?part=formulas or ?part=delivery" }, { status: 400 })
+    if (part === "customers") {
+      await seedCustomers()
+      return NextResponse.json({ ok: true, seeded: { customers: mockCustomerList.length } })
+    }
+    if (part === "suppliers") {
+      await seedSuppliers()
+      return NextResponse.json({ ok: true, seeded: { suppliers: mockSupplierList.length } })
+    }
+    return NextResponse.json({ ok: false, error: "Use ?part=formulas|delivery|customers|suppliers" }, { status: 400 })
   } catch (err) {
     console.error("[v0] seed GET error:", err)
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
   }
+}
+
+async function seedCustomers() {
+  await db.delete(customers)
+  await db.insert(customers).values(
+    mockCustomerList.map((c) => ({
+      id: c.id,
+      customerCode: c.customerCode,
+      customerName: c.customerName,
+      customerNameEn: c.customerNameEn ?? null,
+      customerType: c.customerType,
+      customerTier: c.customerTier,
+      businessType: c.businessType,
+      contactPerson: c.contactPerson ?? null,
+      email: c.email ?? null,
+      phone: c.phone ?? null,
+      creditLimit: c.creditLimit ?? null,
+      creditUsed: c.creditUsed ?? null,
+      isActive: c.isActive,
+      totalOrders: c.totalOrders,
+      totalRevenue: c.totalRevenue,
+      productCount: c.productCount,
+      brandCount: c.brandCount,
+      leadSource: c.leadSource ?? null,
+      province: c.province ?? null,
+      country: c.country,
+      address: null,
+      city: null,
+      postalCode: null,
+      taxId: null,
+      creditDays: 30,
+      salesRepresentative: null,
+      website: null,
+      notes: null,
+    }))
+  )
+}
+
+async function seedSuppliers() {
+  await db.delete(suppliers)
+  await db.insert(suppliers).values(
+    mockSupplierList.map((s) => ({
+      id: s.id,
+      supplierCode: s.supplierCode,
+      supplierName: s.supplierName,
+      supplierNameEn: s.supplierNameEn ?? null,
+      supplierType: s.supplierType,
+      country: s.country,
+      city: s.city ?? null,
+      contactPerson: s.contactPerson ?? null,
+      email: s.email ?? null,
+      phone: s.phone ?? null,
+      isActive: s.isActive,
+      isApproved: s.isApproved,
+      grade: s.grade,
+      qualityRating: s.qualityRating ?? null,
+      deliveryRating: s.deliveryRating ?? null,
+      priceRating: s.priceRating ?? null,
+      materialTags: s.materialTags,
+      status: s.status,
+      description: null,
+      address: null,
+      taxId: null,
+      paymentTerms: null,
+      paymentDays: 30,
+      website: null,
+      notes: null,
+      avgLeadTimeDays: null,
+      ytdOrderValue: null,
+      moq: null,
+      onTimeDeliveryPct: null,
+    }))
+  )
 }
 
 async function seedDelivery() {
