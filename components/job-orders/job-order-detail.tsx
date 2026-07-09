@@ -300,7 +300,7 @@ export function JobOrderDetail({ jobOrder, onStatusChange }: Props) {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto p-8">
         {tab === "overview" && <OverviewTab jobOrder={jobOrder} stats={stats} />}
-        {tab === "tracking" && <DailyTrackingTab jobOrder={jobOrder} stats={stats} />}
+        {tab === "tracking" && <DailyTrackingTab jobOrder={jobOrder} stats={stats} onRefresh={onStatusChange} />}
         {tab === "materials" && <MaterialsTab jobOrder={jobOrder} />}
         {tab === "qc" && <QCTab jobOrder={jobOrder} />}
         {tab === "costing" && <CostingTab jobOrder={jobOrder} />}

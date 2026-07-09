@@ -1,7 +1,8 @@
 import { db } from "@/lib/db"
 import { jobOrders, formulaIngredients, formulas, stockCards } from "@/lib/db/schema"
 import { eq, desc, inArray } from "drizzle-orm"
-import type { JobOrder, MaterialCheck, JOStatus, Priority } from "@/lib/job-order-types"
+import type { JobOrder, MaterialCheck, JOStatus, Priority, ProductionStep } from "@/lib/job-order-types"
+import { getProductionSteps } from "@/lib/db/production-tracking-queries"
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -17,11 +18,12 @@ function nowTs() {
 
 // Map a DB row + formula ingredients into the full JobOrder shape expected by
 // the existing UI components. JSONB blobs (batches, qcResults, costBreakdown)
-// are passed through directly; productionSteps default to an empty array since
-// they are driven by the UI rather than the DB at this stage.
+// are passed through directly; productionSteps are loaded from the dedicated
+// production_steps table (see loadJobOrder / listJobOrders).
 export function rowToJobOrder(
   row: typeof jobOrders.$inferSelect,
   materials: MaterialCheck[] = [],
+  steps: ProductionStep[] = [],
 ): JobOrder {
   // Map DB status values to the UI's JOStatus union.
   const rawStatus: string = row.status ?? "new"
@@ -66,9 +68,7 @@ export function rowToJobOrder(
     paymentTerms: "30 days",
     dueDate: row.plannedEnd ?? new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     startDate: row.plannedStart ?? row.createdAt?.toISOString().slice(0, 10) ?? nowTs().slice(0, 10),
-    productionSteps: safeArr(row.batches).length > 0
-      ? safeArr(row.batches)
-      : [],
+    productionSteps: steps,
     batches: safeArr(row.batches),
     materials,
     qcResults: safeArr(row.qcResults),
@@ -148,8 +148,11 @@ export async function listJobOrders(): Promise<JobOrder[]> {
 
   return Promise.all(
     rows.map(async (row) => {
-      const materials = await buildMaterials(row.formulaId, row.batchSizeKg)
-      return rowToJobOrder(row, materials)
+      const [materials, steps] = await Promise.all([
+        buildMaterials(row.formulaId, row.batchSizeKg),
+        getProductionSteps(row.id),
+      ])
+      return rowToJobOrder(row, materials, steps)
     }),
   )
 }
@@ -157,8 +160,11 @@ export async function listJobOrders(): Promise<JobOrder[]> {
 export async function getJobOrder(id: string): Promise<JobOrder | null> {
   const rows = await db.select().from(jobOrders).where(eq(jobOrders.id, id))
   if (!rows[0]) return null
-  const materials = await buildMaterials(rows[0].formulaId, rows[0].batchSizeKg)
-  return rowToJobOrder(rows[0], materials)
+  const [materials, steps] = await Promise.all([
+    buildMaterials(rows[0].formulaId, rows[0].batchSizeKg),
+    getProductionSteps(rows[0].id),
+  ])
+  return rowToJobOrder(rows[0], materials, steps)
 }
 
 export async function updateJobOrderStatus(id: string, status: JOStatus) {

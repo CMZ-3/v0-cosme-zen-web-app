@@ -344,6 +344,46 @@ export const products = pgTable("products", {
   updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
 })
 
+// ============================================================
+// Production tracking tables
+// ------------------------------------------------------------
+// A job order has an ordered list of production steps; each step accumulates
+// daily production records (good/defect qty, operator, note). No FK constraints
+// per stack guidance — joined by jobOrderId / stepId in application code.
+// ============================================================
+export const productionSteps = pgTable("production_steps", {
+  id: text("id").primaryKey(),
+  jobOrderId: text("jobOrderId").notNull(),
+  stepNumber: integer("stepNumber").notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  status: text("status").notNull().default("pending"), // done | active | pending
+  targetQty: integer("targetQty").notNull().default(0),
+  completedQty: integer("completedQty").notNull().default(0),
+  goodQty: integer("goodQty").notNull().default(0),
+  defectQty: integer("defectQty").notNull().default(0),
+  unit: text("unit").notNull().default("units"),
+  startDate: text("startDate"),
+  endDate: text("endDate"),
+  sortOrder: integer("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const dailyProductionRecords = pgTable("daily_production_records", {
+  id: text("id").primaryKey(),
+  stepId: text("stepId").notNull(),
+  jobOrderId: text("jobOrderId").notNull(),
+  date: text("date").notNull(), // YYYY-MM-DD
+  batchId: text("batchId").notNull().default(""),
+  goodQty: integer("goodQty").notNull().default(0),
+  defectQty: integer("defectQty").notNull().default(0),
+  operatorName: text("operatorName").notNull().default(""),
+  note: text("note").notNull().default(""),
+  cumulativeTotal: integer("cumulativeTotal").notNull().default(0),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
 export type CustomerRow = typeof customers.$inferSelect
 export type SupplierRow = typeof suppliers.$inferSelect
 export type FdaRegistrationRow = typeof fdaRegistrations.$inferSelect
@@ -352,6 +392,8 @@ export type ProductRow = typeof products.$inferSelect
 export type FormulaRow = typeof formulas.$inferSelect
 export type FormulaIngredientRow = typeof formulaIngredients.$inferSelect
 export type JobOrderRow = typeof jobOrders.$inferSelect
+export type ProductionStepRow = typeof productionSteps.$inferSelect
+export type DailyProductionRecordRow = typeof dailyProductionRecords.$inferSelect
 
 export type StockCardRow = typeof stockCards.$inferSelect
 export type StockLotRow = typeof stockLots.$inferSelect
