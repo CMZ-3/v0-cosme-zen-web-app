@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
+import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import { ShieldCheck, Plus, FileUp, FileSpreadsheet, Download, LayoutList, BarChart3, CheckSquare, FileText, FileCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -15,9 +16,15 @@ import type { JkFormData } from "@/components/fda/create-jk-dialog"
 import type { JrFormData } from "@/components/fda/create-jr-dialog"
 import { ImportJkDialog } from "@/components/fda/import-jk-dialog"
 import { ImportJrDialog } from "@/components/fda/import-jr-dialog"
-import { mockFdaKPI, mockFdaList } from "@/lib/fda-mock-data"
-import type { RegistrationType } from "@/lib/fda-types"
+import type { RegistrationType, FdaListItem, FdaKPISummary } from "@/lib/fda-types"
 import { cn } from "@/lib/utils"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+const EMPTY_KPI: FdaKPISummary = {
+  total: 0, totalJk: 0, totalJr: 0, approved: 0, draft: 0, submitted: 0,
+  rejected: 0, expired: 0, expiring30: 0, expiring60: 0, expiring90: 0,
+}
 
 type PageTab = "list" | "dashboard" | "approval"
 
@@ -31,6 +38,10 @@ export default function FdaPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<PageTab>("list")
   const [typeFilter, setTypeFilter] = useState<RegistrationType | "all">("all")
+
+  const { data } = useSWR<{ registrations: FdaListItem[]; kpi: FdaKPISummary }>("/api/fda", fetcher)
+  const registrations = data?.registrations ?? []
+  const kpi = data?.kpi ?? EMPTY_KPI
 
   // Type picker dialog
   const [typePickerOpen, setTypePickerOpen] = useState(false)
@@ -76,9 +87,9 @@ export default function FdaPage() {
   }, [openJr])
 
   const filteredList = useMemo(() => {
-    if (typeFilter === "all") return mockFdaList
-    return mockFdaList.filter((r) => r.registrationType === typeFilter)
-  }, [typeFilter])
+    if (typeFilter === "all") return registrations
+    return registrations.filter((r) => r.registrationType === typeFilter)
+  }, [typeFilter, registrations])
 
   return (
     <div className="flex flex-col gap-5 p-6 pb-12 overflow-y-auto h-screen">
@@ -146,7 +157,7 @@ export default function FdaPage() {
       {/* Tab Content */}
       {activeTab === "list" && (
         <>
-          <FdaKpiCards kpi={mockFdaKPI} />
+          <FdaKpiCards kpi={kpi} />
           <FdaTable data={filteredList} onRowClick={(id) => router.push(`/fda/${id}`)} />
         </>
       )}

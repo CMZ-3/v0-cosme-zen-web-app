@@ -297,8 +297,57 @@ export const suppliers = pgTable("suppliers", {
   updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
 })
 
+// ============================================================
+// FDA / อย. Registrations table
+// ============================================================
+export const fdaRegistrations = pgTable("fda_registrations", {
+  id: text("id").primaryKey(),
+  registrationCode: text("registrationCode").notNull(),
+  registrationType: text("registrationType").notNull().default("jk"), // jk | jr
+  registrationNumber: text("registrationNumber"),
+  productNameTh: text("productNameTh").notNull(),
+  productNameEn: text("productNameEn"),
+  tradeName: text("tradeName"),
+  cosmeticType: text("cosmeticType"),
+  status: text("status").notNull().default("draft"),
+  expiryDate: text("expiryDate"),
+  daysUntilExpiry: integer("daysUntilExpiry"),
+  customerName: text("customerName"),
+  manufacturerName: text("manufacturerName"),
+  renewalCount: integer("renewalCount").notNull().default(0),
+  ingredientCount: integer("ingredientCount"),
+  serviceFee: doublePrecision("serviceFee"),
+  submittedDate: text("submittedDate"),
+  createdAt: text("createdAt").notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
+// ============================================================
+// Products table
+// ============================================================
+export const products = pgTable("products", {
+  id: text("id").primaryKey(),
+  sku: text("sku").notNull(),
+  nameInternal: text("nameInternal").notNull(),
+  thumbnailUrl: text("thumbnailUrl"),
+  customerName: text("customerName").notNull(),
+  brandName: text("brandName"),
+  category: text("category").notNull().default("other"),
+  sellingPrice: doublePrecision("sellingPrice"),
+  totalCostPerUnit: doublePrecision("totalCostPerUnit").notNull().default(0),
+  marginPercent: doublePrecision("marginPercent").notNull().default(0),
+  fdaStatus: text("fdaStatus").notNull().default("not_registered"),
+  status: text("status").notNull().default("draft"),
+  packageSize: text("packageSize"),
+  containerType: text("containerType").notNull().default("bottle"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+})
+
 export type CustomerRow = typeof customers.$inferSelect
 export type SupplierRow = typeof suppliers.$inferSelect
+export type FdaRegistrationRow = typeof fdaRegistrations.$inferSelect
+export type ProductRow = typeof products.$inferSelect
 
 export type FormulaRow = typeof formulas.$inferSelect
 export type FormulaIngredientRow = typeof formulaIngredients.$inferSelect

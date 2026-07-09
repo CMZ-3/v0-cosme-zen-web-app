@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { stockCards, stockLots, stockMovements, stockReservations, simWorkflow, formulas, formulaIngredients, jobOrders, deliveryOrders, customers, suppliers } from "@/lib/db/schema"
+import { stockCards, stockLots, stockMovements, stockReservations, simWorkflow, formulas, formulaIngredients, jobOrders, deliveryOrders, customers, suppliers, fdaRegistrations, products } from "@/lib/db/schema"
 import { INIT_STOCK, INIT_POS, INIT_JOBS, INIT_MOVEMENTS } from "@/lib/stock-simulation-store"
 import { stockItemToCardValues } from "@/lib/db/sim-mapping"
 import { NEW_STOCK_CARDS, FORMULA_ROWS, INGREDIENT_ROWS, JOB_ORDER_ROWS } from "@/lib/db/formula-seed-data"
 import { mockDeliveryOrders } from "@/lib/delivery-mock-data"
 import { mockCustomerList } from "@/lib/customer-mock-data"
 import { mockSupplierList } from "@/lib/supplier-mock-data"
+import { mockFdaList } from "@/lib/fda-mock-data"
+import { mockProducts } from "@/lib/mock-data"
 import type { StockItem } from "@/lib/stock-types"
 
 // Reset + seed the unified stock catalog. This REPLACES all stock rows with the
@@ -77,6 +79,8 @@ export async function POST(req: Request) {
     await seedDelivery()
     await seedCustomers()
     await seedSuppliers()
+    await seedFda()
+    await seedProducts()
 
     return NextResponse.json({
       ok: true,
@@ -90,6 +94,8 @@ export async function POST(req: Request) {
         deliveryOrders: mockDeliveryOrders.length,
         customers: mockCustomerList.length,
         suppliers: mockSupplierList.length,
+        fdaRegistrations: mockFdaList.length,
+        products: mockProducts.length,
       },
     })
   } catch (err) {
@@ -123,7 +129,15 @@ export async function GET(req: Request) {
       await seedSuppliers()
       return NextResponse.json({ ok: true, seeded: { suppliers: mockSupplierList.length } })
     }
-    return NextResponse.json({ ok: false, error: "Use ?part=formulas|delivery|customers|suppliers" }, { status: 400 })
+    if (part === "fda") {
+      await seedFda()
+      return NextResponse.json({ ok: true, seeded: { fdaRegistrations: mockFdaList.length } })
+    }
+    if (part === "products") {
+      await seedProducts()
+      return NextResponse.json({ ok: true, seeded: { products: mockProducts.length } })
+    }
+    return NextResponse.json({ ok: false, error: "Use ?part=formulas|delivery|customers|suppliers|fda|products" }, { status: 400 })
   } catch (err) {
     console.error("[v0] seed GET error:", err)
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
@@ -199,6 +213,54 @@ async function seedSuppliers() {
       ytdOrderValue: null,
       moq: null,
       onTimeDeliveryPct: null,
+    }))
+  )
+}
+
+async function seedFda() {
+  await db.delete(fdaRegistrations)
+  await db.insert(fdaRegistrations).values(
+    mockFdaList.map((r) => ({
+      id: r.id,
+      registrationCode: r.registrationCode,
+      registrationType: r.registrationType,
+      registrationNumber: r.registrationNumber ?? null,
+      productNameTh: r.productNameTh,
+      productNameEn: r.productNameEn ?? null,
+      tradeName: r.tradeName ?? null,
+      cosmeticType: r.cosmeticType ?? null,
+      status: r.status,
+      expiryDate: r.expiryDate ?? null,
+      daysUntilExpiry: r.daysUntilExpiry ?? null,
+      customerName: r.customerName ?? null,
+      manufacturerName: r.manufacturerName ?? null,
+      renewalCount: r.renewalCount,
+      ingredientCount: r.ingredientCount ?? null,
+      serviceFee: r.serviceFee ?? null,
+      submittedDate: r.submittedDate ?? null,
+      createdAt: r.createdAt,
+    }))
+  )
+}
+
+async function seedProducts() {
+  await db.delete(products)
+  await db.insert(products).values(
+    mockProducts.map((p) => ({
+      id: p.id,
+      sku: p.sku,
+      nameInternal: p.nameInternal,
+      thumbnailUrl: p.thumbnailUrl ?? null,
+      customerName: p.customerName,
+      brandName: p.brandName ?? null,
+      category: p.category,
+      sellingPrice: p.sellingPrice ?? null,
+      totalCostPerUnit: p.totalCostPerUnit,
+      marginPercent: p.marginPercent,
+      fdaStatus: p.fdaStatus,
+      status: p.status,
+      packageSize: p.packageSize ?? null,
+      containerType: p.containerType,
     }))
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import useSWR from "swr"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -18,10 +19,15 @@ import { ProductKPIStats } from "./product-kpi-stats"
 import { ProductTable } from "./product-table"
 import { ProductCardGrid } from "./product-card-grid"
 import { ProductDetailDrawer } from "./product-detail-drawer"
-import { mockProducts } from "@/lib/mock-data"
-import type { ProductKPISummary } from "@/lib/product-types"
+import type { ProductKPISummary, ProductListItem } from "@/lib/product-types"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+const EMPTY_KPI: ProductKPISummary = {
+  total: 0, active: 0, inDevelopment: 0, fdaWarning: 0, discontinued: 0,
+}
 
 const categoryDefs = [
   { value: "all", label: "All" },
@@ -48,31 +54,28 @@ export function ProductListPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
 
+  const { data } = useSWR<{ products: ProductListItem[]; kpi: ProductKPISummary }>("/api/products", fetcher)
+  const products = data?.products ?? []
+
   // Dynamic category counts
   const categories = useMemo(() => {
     return categoryDefs.map((cat) => ({
       ...cat,
       count: cat.value === "all"
-        ? mockProducts.length
-        : mockProducts.filter((p) => {
+        ? products.length
+        : products.filter((p) => {
             const otherCats = categoryDefs.filter((c) => c.value !== "all" && c.value !== "other").map((c) => c.value)
             if (cat.value === "other") return !otherCats.includes(p.category)
             return p.category === cat.value
           }).length,
     }))
-  }, [])
+  }, [products])
 
-  // Dynamic KPI
-  const kpi: ProductKPISummary = useMemo(() => ({
-    total: mockProducts.length,
-    active: mockProducts.filter((p) => p.status === "active").length,
-    inDevelopment: mockProducts.filter((p) => p.status === "in_development").length,
-    fdaWarning: mockProducts.filter((p) => p.fdaStatus === "expired" || p.fdaStatus === "pending").length,
-    discontinued: mockProducts.filter((p) => p.status === "discontinued").length,
-  }), [])
+  // Dynamic KPI (from API)
+  const kpi: ProductKPISummary = data?.kpi ?? EMPTY_KPI
 
   const filteredProducts = useMemo(() => {
-    let items = mockProducts
+    let items = products
     if (activeCategory !== "all") {
       const otherCats = categoryDefs.filter((c) => c.value !== "all" && c.value !== "other").map((c) => c.value)
       if (activeCategory === "other") {
@@ -94,7 +97,7 @@ export function ProductListPage() {
       )
     }
     return items
-  }, [activeCategory, activeStatus, search])
+  }, [activeCategory, activeStatus, search, products])
 
   function handleRowClick(id: string) {
     setSelectedProductId(id)
@@ -230,7 +233,7 @@ export function ProductListPage() {
 
         {/* Results count */}
         <div className="mt-3 text-[11px] text-muted-foreground">
-          Showing {filteredProducts.length} of {mockProducts.length} products
+          Showing {filteredProducts.length} of {products.length} products
         </div>
       </div>
 
