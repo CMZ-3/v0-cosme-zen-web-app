@@ -4,7 +4,6 @@ import { useState } from "react"
 import {
   Package,
   Download,
-  RotateCcw,
   BarChart3,
   FlaskConical,
   Lock,
@@ -13,8 +12,15 @@ import {
   AlertTriangle,
   BookOpen,
   PackageOpen,
+  Plus,
+  Upload,
+  Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import { AddStockDialog } from "./add-stock-dialog"
+import { ImportStockDialog } from "./import-stock-dialog"
+import { exportStockToExcel } from "@/lib/stock-export"
 import { StockKpiCards } from "./stock-kpi-cards"
 import { StockOverviewTable } from "./stock-overview-table"
 import { StockMovementsTab } from "./stock-movements-tab"
@@ -37,10 +43,12 @@ type StockTab = "overview" | "simulator" | "reserved" | "incoming" | "receive" |
 
 export function StockListPage() {
   const [activeTab, setActiveTab] = useState<StockTab>("overview")
+  const [addOpen, setAddOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   // Live data from the database (Neon). Fall back to mock while loading or on
   // error so the UI never blanks out during fetch.
-  const { cards, isLoading: cardsLoading } = useStockCards()
+  const { cards, isLoading: cardsLoading, mutate: mutateCards } = useStockCards()
   const { movements, isLoading: movementsLoading } = useStockMovements()
   const liveCards = cards.length > 0 ? cards : mockStockCards
   const liveMovements = movements.length > 0 ? movements : mockStockMovements
@@ -59,6 +67,25 @@ export function StockListPage() {
     totalIncoming: liveCards.reduce((s, c) => s + c.incomingStock, 0),
     totalReserved: liveCards.reduce((s, c) => s + c.reservedStock, 0),
     totalAvailable: liveCards.reduce((s, c) => s + c.available, 0),
+  }
+
+  // Export the current live catalog to a formatted .xlsx workbook.
+  const handleExport = () => {
+    if (liveCards.length === 0) {
+      toast.error("ไม่มีข้อมูลให้ส่งออก")
+      return
+    }
+    try {
+      exportStockToExcel(liveCards)
+      toast.success(`ส่งออก ${liveCards.length} รายการเป็น Excel แล้ว`)
+    } catch {
+      toast.error("ส่งออกไม่สำเร็จ")
+    }
+  }
+
+  // Open the print-ready stock report in a new tab (print / save as PDF there).
+  const handlePrintReport = () => {
+    window.open("/stock/report/print", "_blank", "noopener,noreferrer")
   }
 
   // Tab definitions with live badge counts.
@@ -102,11 +129,36 @@ export function StockListPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-xl text-[12px]">
-              <Download className="h-3.5 w-3.5" /> Export CSV
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 rounded-xl text-[12px]"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="h-3.5 w-3.5" /> Import Excel
             </Button>
-            <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-xl text-[12px]">
-              <RotateCcw className="h-3.5 w-3.5" /> Reset
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 rounded-xl text-[12px]"
+              onClick={handleExport}
+            >
+              <Download className="h-3.5 w-3.5" /> Export Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 rounded-xl text-[12px]"
+              onClick={handlePrintReport}
+            >
+              <Printer className="h-3.5 w-3.5" /> Print Report
+            </Button>
+            <Button
+              size="sm"
+              className="h-9 gap-1.5 rounded-xl text-[12px]"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="h-3.5 w-3.5" /> Add New Stock
             </Button>
           </div>
         </div>
@@ -209,6 +261,19 @@ export function StockListPage() {
           </div>
         </div>
       </div>
+
+      <AddStockDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        categories={Array.from(new Set(liveCards.map((c) => c.category).filter(Boolean)))}
+        units={Array.from(new Set(liveCards.map((c) => c.unit).filter(Boolean)))}
+        onCreated={() => mutateCards()}
+      />
+      <ImportStockDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => mutateCards()}
+      />
     </StockSimulationProvider>
   )
 }
