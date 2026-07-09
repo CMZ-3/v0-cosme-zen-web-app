@@ -242,7 +242,9 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
           CZ
         </Link>
         {!collapsed && (
-          <span className="text-lg font-extrabold tracking-tight text-foreground">CosmeZen</span>
+          <span className="text-[13px] font-extrabold leading-tight tracking-tight text-foreground text-balance">
+            COSMEZEN SAAS CONTROL V7.0
+          </span>
         )}
         <button
           onClick={onToggle}
