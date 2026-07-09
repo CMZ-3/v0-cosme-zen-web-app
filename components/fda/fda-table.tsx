@@ -100,6 +100,35 @@ export function FdaTable({ data, onRowClick, onDeleted }: FdaTableProps) {
     }
   }
 
+  const handleBulkSubmit = async () => {
+    const ids = Array.from(selected)
+    const toastId = toast.loading(`กำลัง submit ${ids.length} รายการ...`)
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          fetch(`/api/fda/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "status", status: "submitted" }),
+          })
+        )
+      )
+      const succeeded = results.filter((r) => r.status === "fulfilled" && (r.value as Response).ok).length
+      const failed = ids.length - succeeded
+      toast.dismiss(toastId)
+      if (failed === 0) {
+        toast.success(`Submit ${succeeded} รายการสำเร็จ`)
+      } else {
+        toast.warning(`Submit ${succeeded}/${ids.length} รายการ (${failed} ล้มเหลว)`)
+      }
+      setSelected(new Set())
+      router.refresh()
+    } catch {
+      toast.dismiss(toastId)
+      toast.error("เกิดข้อผิดพลาด")
+    }
+  }
+
   const handleClone = async (id: string, code: string) => {
     setBusy(id)
     try {
@@ -461,7 +490,7 @@ export function FdaTable({ data, onRowClick, onDeleted }: FdaTableProps) {
           <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Exporting ${selected.size} registrations...`)}>
             <Download className="h-3 w-3" /> Export
           </Button>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.info(`Submitting ${selected.size} registrations...`)}>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={handleBulkSubmit}>
             <Send className="h-3 w-3" /> Submit All
           </Button>
           <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleBulkDelete}>

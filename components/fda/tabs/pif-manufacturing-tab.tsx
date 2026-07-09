@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, Loader2, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -22,6 +23,28 @@ interface ManufacturingTabProps {
 export function FdaPifManufacturingTab({ steps, isDraft, onRefresh }: ManufacturingTabProps) {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [editTarget, setEditTarget] = useState<FdaManufacturingStep | null>(null)
+  const [editForm, setEditForm] = useState<Partial<FdaManufacturingStep>>({})
+  const [saving, setSaving] = useState(false)
+
+  function startEdit(step: FdaManufacturingStep) {
+    setEditTarget(step)
+    setEditForm({ stepName: step.stepName, description: step.description, equipment: step.equipment, temperatureRange: step.temperatureRange, timeDuration: step.timeDuration, rpmRange: step.rpmRange })
+  }
+
+  async function handleSaveEdit() {
+    if (!editTarget) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/fda/manufacturing-steps/${editTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      })
+      if (res.ok) { toast.success("อัปเดต step แล้ว"); setEditTarget(null); onRefresh?.() }
+      else toast.error("เกิดข้อผิดพลาด")
+    } finally { setSaving(false) }
+  }
 
   const handleDelete = async (id: string) => {
     setBusy(true)
@@ -87,7 +110,7 @@ export function FdaPifManufacturingTab({ steps, isDraft, onRefresh }: Manufactur
                   {isDraft && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <button className="rounded p-1 hover:bg-secondary text-muted-foreground" aria-label="Edit step" onClick={() => toast.info("แก้ไขใน detail page")}>
+                        <button className="rounded p-1 hover:bg-secondary text-muted-foreground" aria-label="Edit step" onClick={() => startEdit(step)}>
                           <Pencil className="h-3 w-3" />
                         </button>
                         <button className="rounded p-1 hover:bg-red-50 text-muted-foreground hover:text-red-500" disabled={busy} aria-label="Delete step" onClick={() => setDeleteTarget({ id: step.id, name: step.stepName })}>
@@ -114,6 +137,41 @@ export function FdaPifManufacturingTab({ steps, isDraft, onRefresh }: Manufactur
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-2xl bg-card p-5 shadow-xl border border-border">
+            <p className="mb-4 text-sm font-extrabold text-foreground">แก้ไข Step {editTarget.stepNumber}: {editTarget.stepName}</p>
+            <div className="grid grid-cols-2 gap-2.5">
+              {[
+                { label: "Step Name *", key: "stepName" },
+                { label: "Equipment", key: "equipment" },
+                { label: "Temperature Range", key: "temperatureRange" },
+                { label: "Time Duration", key: "timeDuration" },
+                { label: "RPM Range", key: "rpmRange" },
+                { label: "Description", key: "description" },
+              ].map(({ label, key }) => (
+                <div key={key} className={key === "description" ? "col-span-2" : ""}>
+                  <label className="mb-0.5 block text-[10px] font-bold uppercase text-muted-foreground">{label}</label>
+                  <Input
+                    value={(editForm as Record<string, unknown>)[key] as string ?? ""}
+                    onChange={(e) => setEditForm((p) => ({ ...p, [key]: e.target.value }))}
+                    className="h-8 text-[11px]"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" className="gap-1 text-[11px]" onClick={() => setEditTarget(null)}>
+                <X className="h-3 w-3" /> ยกเลิก
+              </Button>
+              <Button size="sm" className="gap-1 text-[11px]" onClick={handleSaveEdit} disabled={saving}>
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} บันทึก
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
