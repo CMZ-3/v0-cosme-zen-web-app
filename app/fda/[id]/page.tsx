@@ -17,14 +17,14 @@ import { FdaChecklistTab } from "@/components/fda/tabs/checklist-tab"
 import { FdaAuditTab } from "@/components/fda/tabs/audit-tab"
 import { FdaCustomerTab } from "@/components/fda/tabs/customer-tab"
 import { REGISTRATION_TYPE_MAP, FDA_STATUS_MAP } from "@/lib/fda-types"
+import { toast } from "sonner"
 import type {
-  FdaListItem, FdaIngredient, FdaManufacturingStep, FdaRawMaterialSpec,
+  FdaRegistration, FdaIngredient, FdaManufacturingStep, FdaRawMaterialSpec,
   FdaDocument, FdaChecklistItem, FdaAuditLog,
 } from "@/lib/fda-types"
-import { toast } from "sonner"
 
 interface FdaDetailResponse {
-  detail: FdaListItem
+  detail: FdaRegistration
   ingredients: FdaIngredient[]
   manufacturingSteps: FdaManufacturingStep[]
   rawMaterialSpecs: FdaRawMaterialSpec[]

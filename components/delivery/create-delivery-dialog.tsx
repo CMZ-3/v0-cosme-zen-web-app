@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import useSWR from "swr"
 import {
   Dialog,
   DialogContent,
@@ -22,14 +23,7 @@ import {
 } from "@/components/ui/select"
 import { PackageCheck, Truck, MapPin, User, FileText } from "lucide-react"
 
-const mockCustomers = [
-  { id: "cust-1", name: "Glow Lab Co., Ltd." },
-  { id: "cust-2", name: "SkinSoft Co., Ltd." },
-  { id: "cust-3", name: "NatuBeauty" },
-  { id: "cust-4", name: "BeautyKing Trading" },
-  { id: "cust-5", name: "PureMind Co., Ltd." },
-  { id: "cust-6", name: "LuxeSkin Intl." },
-]
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 const shippingMethods = ["Kerry Express", "Flash Express", "J&T Express", "Grab Express", "Lalamove"]
 
@@ -40,6 +34,12 @@ interface CreateDeliveryDialogProps {
 }
 
 export function CreateDeliveryDialog({ open, onOpenChange, onCreated }: CreateDeliveryDialogProps) {
+  const { data: customersData } = useSWR<{ customers: { id: string; customerName: string }[] }>(
+    open ? "/api/customers" : null,
+    fetcher,
+  )
+  const customers = customersData?.customers ?? []
+
   const [customerId, setCustomerId] = useState("")
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split("T")[0])
   const [deliveryDate, setDeliveryDate] = useState("")
@@ -59,7 +59,7 @@ export function CreateDeliveryDialog({ open, onOpenChange, onCreated }: CreateDe
 
   const handleSubmit = async () => {
     if (!customerId) return
-    const customer = mockCustomers.find((c) => c.id === customerId)
+    const customer = customers.find((c) => c.id === customerId)
     if (!customer) return
     setIsSubmitting(true)
     try {
@@ -68,7 +68,7 @@ export function CreateDeliveryDialog({ open, onOpenChange, onCreated }: CreateDe
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId,
-          customerName: customer.name,
+          customerName: customer.customerName,
           salesOrderRef: salesOrderRef.trim() || undefined,
           orderDate,
           deliveryDate: deliveryDate || undefined,
@@ -141,11 +141,11 @@ export function CreateDeliveryDialog({ open, onOpenChange, onCreated }: CreateDe
                 <Label className="text-[11px] font-semibold text-muted-foreground">Customer <span className="text-destructive">*</span></Label>
                 <Select value={customerId} onValueChange={setCustomerId}>
                   <SelectTrigger className="mt-1 rounded-[10px] text-[13px]">
-                    <SelectValue placeholder="Select customer" />
+                    <SelectValue placeholder={customers.length === 0 ? "Loading..." : "Select customer"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockCustomers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.customerName}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

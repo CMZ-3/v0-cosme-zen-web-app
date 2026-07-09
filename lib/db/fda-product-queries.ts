@@ -10,7 +10,7 @@ import type {
   FdaDocumentRow, FdaChecklistRow, FdaAuditLogRow,
 } from "@/lib/db/schema"
 import type {
-  FdaListItem, FdaKPISummary, RegistrationType, FdaStatus,
+  FdaListItem, FdaRegistration, FdaKPISummary, RegistrationType, FdaStatus,
   FdaIngredient, FdaManufacturingStep, FdaRawMaterialSpec, FdaDocument, FdaChecklistItem, FdaAuditLog,
 } from "@/lib/fda-types"
 import type { ProductListItem, ProductKPISummary, ProductCategory, ProductStatus, FDAStatus, ContainerType } from "@/lib/product-types"
@@ -61,6 +61,58 @@ export async function listFdaRegistrations(search?: string): Promise<FdaListItem
 export async function getFdaById(id: string): Promise<FdaListItem | null> {
   const rows = await db.select().from(fdaRegistrations).where(eq(fdaRegistrations.id, id)).limit(1)
   return rows[0] ? rowToFda(rows[0]) : null
+}
+
+/** Returns the full FdaRegistration shape (all columns) — used by the detail page tabs */
+export async function getFdaDetail(id: string): Promise<FdaRegistration | null> {
+  const rows = await db.select().from(fdaRegistrations).where(eq(fdaRegistrations.id, id)).limit(1)
+  if (!rows[0]) return null
+  const r = rows[0]
+  return {
+    id: r.id,
+    registrationCode: r.registrationCode,
+    registrationType: r.registrationType as RegistrationType,
+    registrationNumber: r.registrationNumber ?? undefined,
+    licenseNumber: r.licenseNumber ?? undefined,
+    productNameTh: r.productNameTh,
+    productNameEn: r.productNameEn ?? undefined,
+    fdaProductName: r.fdaProductName ?? undefined,
+    tradeName: r.tradeName ?? undefined,
+    tradeNameEn: r.tradeNameEn ?? undefined,
+    productNameSuffix: r.productNameSuffix ?? undefined,
+    cosmeticType: r.cosmeticType ?? undefined,
+    cosmeticForm: r.cosmeticForm ?? undefined,
+    usageFormat: r.usageFormat ?? undefined,
+    applicationArea: r.applicationArea ?? undefined,
+    productPurpose: r.productPurpose ?? undefined,
+    containerType: r.containerType ?? undefined,
+    productForm: r.productForm ?? undefined,
+    usageInstructions: r.usageInstructions ?? undefined,
+    warnings: r.warnings ?? undefined,
+    combinedRegistrationNos: r.combinedRegistrationNos ?? undefined,
+    registrationDate: r.registrationDate ?? undefined,
+    submittedDate: r.submittedDate ?? undefined,
+    expiryDate: r.expiryDate ?? undefined,
+    renewalCount: r.renewalCount,
+    manufacturerName: r.manufacturerName ?? undefined,
+    manufacturerAddress: r.manufacturerAddress ?? undefined,
+    manufacturerLicense: r.manufacturerLicense ?? undefined,
+    manufacturerStorageAddress: r.manufacturerStorageAddress ?? undefined,
+    importerName: r.importerName ?? undefined,
+    importerAddress: r.importerAddress ?? undefined,
+    formulaId: r.formulaId ?? undefined,
+    customerId: r.customerId ?? undefined,
+    customerName: r.customerName ?? undefined,
+    status: r.status as FdaStatus,
+    approvalComment: r.approvalComment ?? undefined,
+    rejectionReason: r.rejectionReason ?? undefined,
+    serviceFee: r.serviceFee ?? 0,
+    feeNotes: r.feeNotes ?? undefined,
+    notes: r.notes ?? undefined,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt ? r.updatedAt.toISOString().slice(0, 10) : r.createdAt,
+    createdBy: r.createdBy ?? undefined,
+  }
 }
 
 export async function getFdaKPI(): Promise<FdaKPISummary> {
@@ -162,13 +214,12 @@ export async function getFdaDocuments(registrationId: string): Promise<FdaDocume
     id: r.id,
     registrationId: r.registrationId,
     documentType: r.documentType as FdaDocument["documentType"],
-    documentName: r.documentName,
-    fileName: r.fileName ?? undefined,
-    fileUrl: r.fileUrl ?? undefined,
+    // Map DB column names → FdaDocument interface fields
+    fileName: r.fileName ?? r.documentName,
+    title: r.documentName,
     fileSize: r.fileSize ?? undefined,
-    uploadedAt: r.uploadedAt ?? undefined,
-    notes: r.notes ?? undefined,
-    sortOrder: r.sortOrder,
+    description: r.notes ?? undefined,
+    createdAt: r.uploadedAt ?? new Date().toISOString().slice(0, 10),
   }))
 }
 
@@ -179,12 +230,10 @@ export async function getFdaChecklist(registrationId: string): Promise<FdaCheckl
   return rows.map((r: FdaChecklistRow) => ({
     id: r.id,
     registrationId: r.registrationId,
-    category: r.category,
-    item: r.item,
-    isRequired: r.isRequired,
+    // Map DB category+item → checklistKey used by the tab component
+    checklistKey: `${r.category}_${r.id}`,
     isCompleted: r.isCompleted,
     notes: r.notes ?? undefined,
-    sortOrder: r.sortOrder,
   }))
 }
 

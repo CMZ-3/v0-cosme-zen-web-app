@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import {
-  getFdaById,
+  getFdaDetail,
   getFdaIngredients,
   getFdaManufacturingSteps,
   getFdaRawMaterialSpecs,
@@ -17,7 +17,7 @@ export async function GET(
   try {
     const [detail, ingredients, manufacturingSteps, rawMaterialSpecs, documents, checklist, auditLogs] =
       await Promise.all([
-        getFdaById(id),
+        getFdaDetail(id),
         getFdaIngredients(id),
         getFdaManufacturingSteps(id),
         getFdaRawMaterialSpecs(id),

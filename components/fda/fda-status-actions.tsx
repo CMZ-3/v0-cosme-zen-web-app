@@ -2,12 +2,12 @@
 
 import { ArrowLeft, Copy, RotateCcw, Send, CheckCircle, XCircle, Ban, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { FdaRegistration, FdaStatus } from "@/lib/fda-types"
-import { FDA_STATUS_MAP, REGISTRATION_TYPE_MAP, FDA_TRANSITIONS } from "@/lib/fda-types"
 import { toast } from "sonner"
+import type { FdaStatus } from "@/lib/fda-types"
+import { FDA_STATUS_MAP, REGISTRATION_TYPE_MAP, FDA_TRANSITIONS } from "@/lib/fda-types"
 
 interface FdaStatusActionsProps {
-  registration: FdaRegistration
+  registration: { status: FdaStatus }
   isAdmin?: boolean
 }
 
