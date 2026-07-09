@@ -26,6 +26,8 @@ import {
   movementStatusColors,
 } from "@/lib/stock-types"
 import { AvailabilityBar } from "@/components/stock/availability-bar"
+import { MovementDialog } from "@/components/stock/movement-dialog"
+import { AddStockDialog } from "@/components/stock/add-stock-dialog"
 
 export default function StockDetailPage() {
   const params = useParams()
@@ -37,6 +39,10 @@ export default function StockDetailPage() {
   const { card: liveCard, lots: liveLots, movements: liveMovements, reservations: liveReservations } =
     useStockCard(cardId)
   const card = liveCard ?? mockStockCards.find((c) => c.id === params.id)
+
+  // Dialog state
+  const [movementDialogMode, setMovementDialogMode] = useState<"receive" | "issue" | null>(null)
+  const [addStockOpen, setAddStockOpen] = useState(false)
 
   // Movement approval state -- spec 3.2: pending → approved, approved → reversed
   const [movementStatuses, setMovementStatuses] = useState<Record<string, string>>({})
@@ -99,19 +105,19 @@ export default function StockDetailPage() {
             <p className="text-sm text-muted-foreground mt-0.5">{card.itemName}</p>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Receive stock for ${card.itemCode}`)}>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => setMovementDialogMode("receive")}>
               <PackagePlus className="h-3 w-3" /> Receive
             </Button>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Issue stock from ${card.itemCode}`)}>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => setMovementDialogMode("issue")}>
               <ArrowDownToLine className="h-3 w-3" /> Issue
             </Button>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.info(`Transfer ${card.itemCode}`)}>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => setMovementDialogMode("receive")}>
               <ArrowLeftRight className="h-3 w-3" /> Transfer
             </Button>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.success(`Printing label for ${card.itemCode}`)}>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => window.open(`/barcode?item=${card.itemCode}`, "_blank")}>
               <Tags className="h-3 w-3" /> Label
             </Button>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => toast.info(`Editing ${card.itemCode}`)}>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-xl text-[11px]" onClick={() => setAddStockOpen(true)}>
               <Pencil className="h-3 w-3" /> Edit
             </Button>
           </div>
@@ -554,6 +560,23 @@ export default function StockDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Receive / Issue Dialog */}
+      {movementDialogMode && (
+        <MovementDialog
+          card={card as Parameters<typeof MovementDialog>[0]["card"]}
+          mode={movementDialogMode}
+          open={true}
+          onOpenChange={(o) => { if (!o) setMovementDialogMode(null) }}
+        />
+      )}
+
+      {/* Edit / Add card dialog */}
+      <AddStockDialog
+        open={addStockOpen}
+        onOpenChange={setAddStockOpen}
+        onCreated={() => setAddStockOpen(false)}
+      />
     </div>
   )
 }

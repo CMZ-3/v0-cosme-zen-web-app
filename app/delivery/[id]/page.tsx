@@ -24,6 +24,8 @@ import {
   Camera,
   Pen,
   ChevronRight,
+  FlaskConical,
+  Layers,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -82,6 +84,25 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
   )
 
   const order = data?.order ?? null
+  const [actionBusy, setActionBusy] = useState<string | null>(null)
+
+  const patchStatus = async (status: string) => {
+    setActionBusy(status)
+    try {
+      const res = await fetch(`/api/delivery-orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed")
+      toast.success(`Status updated to ${status}`)
+      await mutate()
+    } catch (e) {
+      toast.error("Action failed", { description: String(e) })
+    } finally {
+      setActionBusy(null)
+    }
+  }
 
   const orderLines = useMemo(() => {
     const matched = mockDeliveryLines.filter((l) => l.deliveryOrderId === id)
@@ -152,14 +173,24 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
             variant={a.variant}
             size="sm"
             className={cn("gap-1.5 rounded-[10px] text-[12px] font-semibold", a.variant === "default" && a.color && `${a.color} text-white`)}
+            disabled={!!actionBusy}
             onClick={async () => {
+              const statusMap: Record<string, string> = {
+                "Reserve": "reserved",
+                "Start Picking": "picking",
+                "Ship": "shipped",
+                "Confirm Delivered": "delivered",
+                "Complete": "completed",
+                "Release": "draft",
+                "Cancel": "cancelled",
+              }
               if (a.label === "Start Picking" && orderLines.length > 0) {
                 setVerifyMode("picking")
               } else if (a.label === "Ship" && orderLines.length > 0) {
                 setVerifyMode("shipping")
               } else {
-                toast.success(`${a.label}: ${order.deliveryNumber}`)
-                await mutate()
+                const newStatus = statusMap[a.label]
+                if (newStatus) await patchStatus(newStatus)
               }
             }}
           >
@@ -221,7 +252,7 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
             {renderStatusActions()}
             <div className="flex gap-2">
               {(order.status === "draft" || order.status === "reserved") && (
-                <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]" onClick={() => toast.info(`Editing ${order.deliveryNumber}`)}>
+                <Button variant="outline" size="sm" className="gap-1 rounded-[10px] text-[11px]" onClick={() => router.push(`/delivery?id=${id}&edit=1`)}>
                   <Pencil className="h-3 w-3" /> Edit
                 </Button>
               )}
@@ -492,11 +523,37 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ id: s
 
           {/* Traceability Tab */}
           <TabsContent value="trace" className="mt-4">
-            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-20">
-              <Package className="h-10 w-10 text-muted-foreground/30" />
-              <p className="mt-3 text-sm font-bold text-foreground">Lot Traceability</p>
-              <p className="text-[11px] text-muted-foreground">Full traceability chain from raw materials to delivery coming soon</p>
-            </div>
+            <Card className="border-border rounded-2xl">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-[13px] font-bold">Lot Traceability Chain</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-0">
+                  {[
+                    { step: "Raw Material Receipt", desc: "Ingredients received from suppliers", icon: PackageCheck, color: "bg-blue-500", detail: "Lot tracked from PO → GRN → stock card" },
+                    { step: "Bulk Production (JO)", desc: order.salesOrderRef ? `Linked JO: ${order.salesOrderRef}` : "Job order batch production", icon: FlaskConical, color: "bg-violet-500", detail: "Formula → production steps → QC pass" },
+                    { step: "Filling & Packaging", desc: "Finished goods by lot", icon: Layers, color: "bg-amber-500", detail: "FG lot assigned per batch" },
+                    { step: "QC Release", desc: "Quality check passed", icon: ClipboardList, color: "bg-emerald-500", detail: "Certificate of analysis on file" },
+                    { step: "Delivery Dispatch", desc: order.deliveryNumber, icon: Truck, color: "bg-teal-500", detail: `Shipped: ${formatDate(order.shippedAt) || "--"} · Tracking: ${order.trackingNumber || "--"}` },
+                    { step: "Customer Receipt", desc: order.customerName, icon: User, color: "bg-indigo-500", detail: `Delivered: ${formatDate(order.actualDeliveryDate) || "--"} · Receiver: ${order.receiverName || "--"}` },
+                  ].map((node, i, arr) => (
+                    <div key={node.step} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white", node.color)}>
+                          <node.icon className="h-4 w-4" />
+                        </div>
+                        {i < arr.length - 1 && <div className="w-0.5 flex-1 my-1 bg-border" />}
+                      </div>
+                      <div className="pb-6 flex-1 min-w-0">
+                        <p className="text-[13px] font-bold text-foreground">{node.step}</p>
+                        <p className="text-[11px] text-muted-foreground">{node.desc}</p>
+                        <p className="text-[10px] text-muted-foreground/70 mt-0.5 font-mono">{node.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

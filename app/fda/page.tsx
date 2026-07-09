@@ -18,6 +18,8 @@ import { ImportJkDialog } from "@/components/fda/import-jk-dialog"
 import { ImportJrDialog } from "@/components/fda/import-jr-dialog"
 import type { RegistrationType, FdaListItem, FdaKPISummary } from "@/lib/fda-types"
 import { cn } from "@/lib/utils"
+import { FdaDashboard } from "@/components/fda/fda-dashboard"
+import { FdaApprovalQueue } from "@/components/fda/fda-approval-queue"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -162,18 +164,10 @@ export default function FdaPage() {
         </>
       )}
       {activeTab === "dashboard" && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-20">
-          <BarChart3 className="h-10 w-10 text-muted-foreground/30" />
-          <p className="mt-3 text-sm font-bold text-foreground">FDA Dashboard</p>
-          <p className="text-[11px] text-muted-foreground">Charts, expiry timeline & renewal planning coming soon</p>
-        </div>
+        <FdaDashboard kpi={kpi} registrations={registrations} />
       )}
       {activeTab === "approval" && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card py-20">
-          <CheckSquare className="h-10 w-10 text-muted-foreground/30" />
-          <p className="mt-3 text-sm font-bold text-foreground">Approval Queue</p>
-          <p className="text-[11px] text-muted-foreground">Pending review & approval workflow coming soon</p>
-        </div>
+        <FdaApprovalQueue registrations={registrations} onRowClick={(id) => router.push(`/fda/${id}`)} />
       )}
 
       {/* ───── Type Picker Dialog ───── */}

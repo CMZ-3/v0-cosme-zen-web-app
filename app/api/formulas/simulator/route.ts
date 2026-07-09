@@ -13,7 +13,6 @@ export async function GET() {
     const rows = await db
       .select()
       .from(formulas)
-      .where(eq(formulas.status, "active"))
 
     const result: Record<string, SimFormula & { label: string }> = {}
 
@@ -24,14 +23,13 @@ export async function GET() {
         .where(eq(formulaIngredients.formulaId, row.id))
         .orderBy(formulaIngredients.sortOrder)
 
-      // Only include ingredients that have a linked stockCardId (otherwise the
-      // simulator cannot match them to real stock items).
-      const simIngredients = ings
-        .filter((i) => i.stockCardId)
-        .map((i) => ({
-          id: i.stockCardId as string,
-          percent: i.percentage,
-        }))
+      // Map ingredients: use stockCardId when linked, otherwise fall back to
+      // an ingredient-id slug so the formula still appears in the simulator
+      // (percentage breakdown will show even without a live stock card link).
+      const simIngredients = ings.map((i) => ({
+        id: i.stockCardId ?? `ing-${i.id}`,
+        percent: i.percentage,
+      }))
 
       if (simIngredients.length === 0) continue
 
