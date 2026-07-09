@@ -72,9 +72,13 @@ export function StockOverviewTable({ data }: StockOverviewTableProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="raw_material">Raw Material</SelectItem>
-              <SelectItem value="packaging">Packaging</SelectItem>
-              <SelectItem value="finished_good">Finished Good</SelectItem>
+              <SelectItem value="raw_material">{itemTypeLabels.raw_material}</SelectItem>
+              <SelectItem value="packaging">{itemTypeLabels.packaging}</SelectItem>
+              <SelectItem value="packaging_aux">{itemTypeLabels.packaging_aux}</SelectItem>
+              <SelectItem value="finished_good">{itemTypeLabels.finished_good}</SelectItem>
+              <SelectItem value="overhead">{itemTypeLabels.overhead}</SelectItem>
+              <SelectItem value="labor">{itemTypeLabels.labor}</SelectItem>
+              <SelectItem value="tester">{itemTypeLabels.tester}</SelectItem>
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
