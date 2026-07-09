@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, Loader2, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -19,9 +20,58 @@ interface RawMaterialsTabProps {
   onRefresh?: () => void
 }
 
+type EditForm = {
+  materialName: string
+  specification: string
+  testMethod: string
+  acceptanceCriteria: string
+  supplier: string
+}
+
 export function FdaPifRawMaterialsTab({ specs, isDraft, onRefresh }: RawMaterialsTabProps) {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [editTarget, setEditTarget] = useState<FdaRawMaterialSpec | null>(null)
+  const [editForm, setEditForm] = useState<EditForm>({ materialName: "", specification: "", testMethod: "", acceptanceCriteria: "", supplier: "" })
+  const [saving, setSaving] = useState(false)
+
+  function startEdit(spec: FdaRawMaterialSpec) {
+    setEditTarget(spec)
+    setEditForm({
+      materialName: spec.materialName ?? "",
+      specification: spec.specification ?? "",
+      testMethod: spec.testMethod ?? "",
+      acceptanceCriteria: spec.acceptanceCriteria ?? "",
+      supplier: spec.supplier ?? "",
+    })
+  }
+
+  async function handleSaveEdit() {
+    if (!editTarget) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/fda/raw-material-specs/${editTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          materialName: editForm.materialName,
+          specification: editForm.specification || null,
+          testMethod: editForm.testMethod || null,
+          acceptanceCriteria: editForm.acceptanceCriteria || null,
+          supplier: editForm.supplier || null,
+        }),
+      })
+      if (res.ok) {
+        toast.success("อัปเดต spec แล้ว")
+        setEditTarget(null)
+        onRefresh?.()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const handleDelete = async (id: string) => {
     setBusy(true)
@@ -73,10 +123,19 @@ export function FdaPifRawMaterialsTab({ specs, isDraft, onRefresh }: RawMaterial
                   {isDraft && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <button className="rounded p-1 hover:bg-secondary text-muted-foreground" aria-label="Edit spec" onClick={() => toast.info("แก้ไขใน detail page")}>
+                        <button
+                          className="rounded p-1 hover:bg-secondary text-muted-foreground"
+                          aria-label="Edit spec"
+                          onClick={() => startEdit(spec)}
+                        >
                           <Pencil className="h-3 w-3" />
                         </button>
-                        <button className="rounded p-1 hover:bg-red-50 text-muted-foreground hover:text-red-500" disabled={busy} aria-label="Delete spec" onClick={() => setDeleteTarget({ id: spec.id, name: spec.materialName })}>
+                        <button
+                          className="rounded p-1 hover:bg-red-50 text-muted-foreground hover:text-red-500"
+                          disabled={busy}
+                          aria-label="Delete spec"
+                          onClick={() => setDeleteTarget({ id: spec.id, name: spec.materialName })}
+                        >
                           <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
@@ -88,6 +147,7 @@ export function FdaPifRawMaterialsTab({ specs, isDraft, onRefresh }: RawMaterial
           </TableBody>
         </Table>
       </div>
+
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -96,10 +156,50 @@ export function FdaPifRawMaterialsTab({ specs, isDraft, onRefresh }: RawMaterial
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteTarget && handleDelete(deleteTarget.id)}>ลบ</AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && handleDelete(deleteTarget.id)}
+            >
+              ลบ
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Inline edit overlay */}
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setEditTarget(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-card p-5 shadow-xl border border-border" onClick={(e) => e.stopPropagation()}>
+            <p className="mb-4 text-sm font-extrabold text-foreground">แก้ไข Raw Material Spec</p>
+            <div className="grid grid-cols-2 gap-2.5">
+              {([
+                { label: "Material Name *", key: "materialName", span: true },
+                { label: "Supplier", key: "supplier" },
+                { label: "Specification", key: "specification" },
+                { label: "Test Method", key: "testMethod" },
+                { label: "Acceptance Criteria", key: "acceptanceCriteria", span: true },
+              ] as { label: string; key: keyof EditForm; span?: boolean }[]).map(({ label, key, span }) => (
+                <div key={key} className={span ? "col-span-2" : ""}>
+                  <label className="mb-0.5 block text-[10px] font-bold uppercase text-muted-foreground">{label}</label>
+                  <Input
+                    value={editForm[key]}
+                    onChange={(e) => setEditForm((p) => ({ ...p, [key]: e.target.value }))}
+                    className="h-8 text-[11px]"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" className="gap-1 text-[11px]" onClick={() => setEditTarget(null)}>
+                <X className="h-3 w-3" /> ยกเลิก
+              </Button>
+              <Button size="sm" className="gap-1 text-[11px]" onClick={handleSaveEdit} disabled={saving}>
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} บันทึก
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

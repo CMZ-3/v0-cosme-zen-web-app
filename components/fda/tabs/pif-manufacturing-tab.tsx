@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, Loader2, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -19,9 +20,61 @@ interface ManufacturingTabProps {
   onRefresh?: () => void
 }
 
+type EditForm = {
+  stepName: string
+  description: string
+  equipment: string
+  temperatureRange: string
+  timeDuration: string
+  rpmRange: string
+}
+
 export function FdaPifManufacturingTab({ steps, isDraft, onRefresh }: ManufacturingTabProps) {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [editTarget, setEditTarget] = useState<FdaManufacturingStep | null>(null)
+  const [editForm, setEditForm] = useState<EditForm>({ stepName: "", description: "", equipment: "", temperatureRange: "", timeDuration: "", rpmRange: "" })
+  const [saving, setSaving] = useState(false)
+
+  function startEdit(step: FdaManufacturingStep) {
+    setEditTarget(step)
+    setEditForm({
+      stepName: step.stepName ?? "",
+      description: step.description ?? "",
+      equipment: step.equipment ?? "",
+      temperatureRange: step.temperatureRange ?? "",
+      timeDuration: step.timeDuration ?? "",
+      rpmRange: step.rpmRange ?? "",
+    })
+  }
+
+  async function handleSaveEdit() {
+    if (!editTarget) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/fda/manufacturing-steps/${editTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepName: editForm.stepName,
+          description: editForm.description || null,
+          equipment: editForm.equipment || null,
+          temperatureRange: editForm.temperatureRange || null,
+          timeDuration: editForm.timeDuration || null,
+          rpmRange: editForm.rpmRange || null,
+        }),
+      })
+      if (res.ok) {
+        toast.success("อัปเดต step แล้ว")
+        setEditTarget(null)
+        onRefresh?.()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const handleDelete = async (id: string) => {
     setBusy(true)
@@ -87,10 +140,19 @@ export function FdaPifManufacturingTab({ steps, isDraft, onRefresh }: Manufactur
                   {isDraft && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <button className="rounded p-1 hover:bg-secondary text-muted-foreground" aria-label="Edit step" onClick={() => toast.info("แก้ไขใน detail page")}>
+                        <button
+                          className="rounded p-1 hover:bg-secondary text-muted-foreground"
+                          aria-label="Edit step"
+                          onClick={() => startEdit(step)}
+                        >
                           <Pencil className="h-3 w-3" />
                         </button>
-                        <button className="rounded p-1 hover:bg-red-50 text-muted-foreground hover:text-red-500" disabled={busy} aria-label="Delete step" onClick={() => setDeleteTarget({ id: step.id, name: step.stepName })}>
+                        <button
+                          className="rounded p-1 hover:bg-red-50 text-muted-foreground hover:text-red-500"
+                          disabled={busy}
+                          aria-label="Delete step"
+                          onClick={() => setDeleteTarget({ id: step.id, name: step.stepName })}
+                        >
                           <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
@@ -102,6 +164,7 @@ export function FdaPifManufacturingTab({ steps, isDraft, onRefresh }: Manufactur
           </TableBody>
         </Table>
       </div>
+
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -110,10 +173,52 @@ export function FdaPifManufacturingTab({ steps, isDraft, onRefresh }: Manufactur
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteTarget && handleDelete(deleteTarget.id)}>ลบ</AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && handleDelete(deleteTarget.id)}
+            >
+              ลบ
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Inline edit overlay */}
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setEditTarget(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-card p-5 shadow-xl border border-border" onClick={(e) => e.stopPropagation()}>
+            <p className="mb-1 text-sm font-extrabold text-foreground">แก้ไข Step {editTarget.stepNumber}</p>
+            <p className="mb-4 text-[11px] text-muted-foreground">{editTarget.stepName}</p>
+            <div className="grid grid-cols-2 gap-2.5">
+              {([
+                { label: "Step Name *", key: "stepName", span: true },
+                { label: "Equipment", key: "equipment" },
+                { label: "Temperature Range", key: "temperatureRange" },
+                { label: "Time Duration", key: "timeDuration" },
+                { label: "RPM Range", key: "rpmRange" },
+                { label: "Description", key: "description", span: true },
+              ] as { label: string; key: keyof EditForm; span?: boolean }[]).map(({ label, key, span }) => (
+                <div key={key} className={span ? "col-span-2" : ""}>
+                  <label className="mb-0.5 block text-[10px] font-bold uppercase text-muted-foreground">{label}</label>
+                  <Input
+                    value={editForm[key]}
+                    onChange={(e) => setEditForm((p) => ({ ...p, [key]: e.target.value }))}
+                    className="h-8 text-[11px]"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" className="gap-1 text-[11px]" onClick={() => setEditTarget(null)}>
+                <X className="h-3 w-3" /> ยกเลิก
+              </Button>
+              <Button size="sm" className="gap-1 text-[11px]" onClick={handleSaveEdit} disabled={saving}>
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} บันทึก
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
