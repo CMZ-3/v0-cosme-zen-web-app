@@ -182,7 +182,8 @@ export async function getSupplierDetail(id: string): Promise<SupplierDetail | nu
     certificates: [],
     catalogItems: [],
     documents: [],
-    coaList: [],
+    createdAt: r.createdAt.toISOString().slice(0, 10),
+    updatedAt: r.updatedAt.toISOString().slice(0, 10),
   }
 }
 
