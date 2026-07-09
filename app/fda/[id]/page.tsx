@@ -1,12 +1,16 @@
 "use client"
 
-import { use } from "react"
+import { use, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import useSWR from "swr"
-import { ArrowLeft, Copy, RotateCcw, Pencil, ChevronRight, Loader2 } from "lucide-react"
+import useSWR, { mutate } from "swr"
+import { ArrowLeft, Copy, RotateCcw, Pencil, ChevronRight, Loader2, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { FdaStatusActions } from "@/components/fda/fda-status-actions"
 import { FdaOverviewTab } from "@/components/fda/tabs/overview-tab"
 import { FdaPifIngredientsTab } from "@/components/fda/tabs/pif-ingredients-tab"
@@ -39,7 +43,40 @@ export default function FdaDetailPage({ params }: { params: Promise<{ id: string
   const { id } = use(params)
   const router = useRouter()
 
-  const { data, isLoading, error } = useSWR<FdaDetailResponse>(`/api/fda/${id}`, fetcher)
+  const swrKey = `/api/fda/${id}`
+  const { data, isLoading, error } = useSWR<FdaDetailResponse>(swrKey, fetcher)
+  const [showDelete, setShowDelete] = useState(false)
+  const [cloningBusy, setCloningBusy] = useState(false)
+
+  const handleDelete = async () => {
+    const res = await fetch(`/api/fda/${id}`, { method: "DELETE" })
+    if (res.ok) {
+      toast.success("ลบทะเบียนแล้ว")
+      router.push("/fda")
+    } else {
+      toast.error("เกิดข้อผิดพลาด")
+    }
+  }
+
+  const handleClone = async () => {
+    setCloningBusy(true)
+    try {
+      const res = await fetch(`/api/fda/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clone" }),
+      })
+      if (res.ok) {
+        const { id: newId, registrationCode } = await res.json()
+        toast.success(`Clone แล้ว → ${registrationCode}`)
+        router.push(`/fda/${newId}`)
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setCloningBusy(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -101,9 +138,9 @@ export default function FdaDetailPage({ params }: { params: Promise<{ id: string
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <FdaStatusActions registration={detail} />
+            <FdaStatusActions registration={detail} onStatusChanged={() => mutate(swrKey)} />
             {isDraft && (
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => toast.info(`Editing ${detail.registrationCode}`)}>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => router.push(`/fda/${id}?edit=1`)}>
                 <Pencil className="h-3 w-3" /> Edit
               </Button>
             )}
@@ -111,9 +148,18 @@ export default function FdaDetailPage({ params }: { params: Promise<{ id: string
               variant="outline"
               size="sm"
               className="h-8 text-xs gap-1"
-              onClick={() => toast.info("Clone functionality")}
+              disabled={cloningBusy}
+              onClick={handleClone}
             >
               <Copy className="h-3 w-3" /> Clone
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1 text-destructive hover:text-destructive"
+              onClick={() => setShowDelete(true)}
+            >
+              <Trash2 className="h-3 w-3" /> Delete
             </Button>
           </div>
         </div>
@@ -187,6 +233,26 @@ export default function FdaDetailPage({ params }: { params: Promise<{ id: string
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบทะเบียน</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ &quot;{detail.registrationCode} — {detail.productNameTh}&quot; อย่างถาวรใช่หรือไม่?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

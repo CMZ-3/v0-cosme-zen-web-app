@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Table,
   TableBody,
@@ -79,11 +80,30 @@ interface ProductTableProps {
 }
 
 export function ProductTable({ products, onRowClick }: ProductTableProps) {
+  const router = useRouter()
   const [sortKey, setSortKey] = useState<SortKey>("nameInternal")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<ProductListItem | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleteBusy(true)
+    try {
+      const res = await fetch(`/api/products/${deleteTarget.id}`, { method: "DELETE" })
+      if (res.ok) {
+        toast.success(`Product "${deleteTarget.nameInternal}" discontinued`)
+        router.refresh()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setDeleteBusy(false)
+      setDeleteTarget(null)
+    }
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -307,10 +327,8 @@ export function ProductTable({ products, onRowClick }: ProductTableProps) {
             <AlertDialogCancel className="rounded-[10px]">Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="rounded-[10px] bg-[#ef4444] text-card hover:bg-[#dc2626]"
-              onClick={() => {
-                toast.success(`Product "${deleteTarget?.nameInternal}" deleted`)
-                setDeleteTarget(null)
-              }}
+              disabled={deleteBusy}
+              onClick={handleDelete}
             >
               Delete
             </AlertDialogAction>

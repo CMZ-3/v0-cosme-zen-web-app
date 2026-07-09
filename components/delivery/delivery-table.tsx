@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Search, Eye, Pencil, Printer, Flag, MapPin, MoreHorizontal, ArrowUpDown, Copy, XCircle, Trash2, Truck } from "lucide-react"
 import {
   DropdownMenu,
@@ -9,7 +10,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useToast } from "@/hooks/use-toast"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -67,9 +72,69 @@ async function patchStatus(id: string, status: string) {
 }
 
 export function DeliveryTable({ data, onRowClick, onStatusChange }: DeliveryTableProps) {
-  const { toast } = useToast()
+  const router = useRouter()
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; number: string } | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const handleDelete = async (id: string, number: string) => {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/delivery-orders/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        toast.success(`ลบ ${number} แล้ว`)
+        onStatusChange?.()
+        router.refresh()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setBusy(null)
+      setDeleteTarget(null)
+    }
+  }
+
+  const handleClone = async (id: string, number: string) => {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/delivery-orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clone" }),
+      })
+      if (res.ok) {
+        const { deliveryNumber } = await res.json()
+        toast.success(`Duplicate จาก ${number} → ${deliveryNumber}`)
+        onStatusChange?.()
+        router.refresh()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleCancel = async (id: string, number: string) => {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/delivery-orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" }),
+      })
+      if (res.ok) {
+        toast.success(`${number} ยกเลิกแล้ว`)
+        onStatusChange?.()
+        router.refresh()
+      } else {
+        toast.error("เกิดข้อผิดพลาด")
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<"deliveryDate" | "totalAmount" | null>(null)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
@@ -328,22 +393,22 @@ export function DeliveryTable({ data, onRowClick, onStatusChange }: DeliveryTabl
                               <Eye className="mr-2 h-3.5 w-3.5" /> View Detail
                             </DropdownMenuItem>
                             {(row.status === "draft" || row.status === "reserved" || row.status === "picking") && (
-                              <DropdownMenuItem onClick={() => toast({ title: "Edit", description: `Editing ${row.deliveryNumber}` })}>
+                              <DropdownMenuItem onClick={() => onRowClick?.(row.id)}>
                                 <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={() => toast({ title: "Duplicated", description: `Cloned ${row.deliveryNumber}` })}>
+                            <DropdownMenuItem disabled={busy === row.id} onClick={() => handleClone(row.id, row.deliveryNumber)}>
                               <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate
                             </DropdownMenuItem>
                             {row.status === "shipped" && (
-                              <DropdownMenuItem onClick={() => toast({ title: "Tracking", description: row.trackingNumber || "No tracking yet" })}>
+                              <DropdownMenuItem onClick={() => { if (row.trackingNumber) window.open(`https://track.example.com?q=${row.trackingNumber}`, "_blank"); else toast.info("ยังไม่มีเลข Tracking") }}>
                                 <MapPin className="mr-2 h-3.5 w-3.5" /> Track Shipment
                               </DropdownMenuItem>
                             )}
                             {row.jobStatus === "pending_close" && (
                               <DropdownMenuItem onClick={async () => {
                                 await patchStatus(row.id, "completed")
-                                toast({ title: "Job Closed", description: `${row.deliveryNumber} marked as completed` })
+                                toast.success(`${row.deliveryNumber} Job Closed`)
                                 onStatusChange?.()
                               }}>
                                 <Flag className="mr-2 h-3.5 w-3.5" /> Close Job
@@ -351,12 +416,12 @@ export function DeliveryTable({ data, onRowClick, onStatusChange }: DeliveryTabl
                             )}
                             <DropdownMenuSeparator />
                             {(row.status === "draft" || row.status === "reserved") && (
-                              <DropdownMenuItem className="text-amber-600 focus:text-amber-600" onClick={() => toast({ title: "Cancelled", description: `${row.deliveryNumber} cancelled`, variant: "destructive" })}>
+                              <DropdownMenuItem className="text-amber-600 focus:text-amber-600" disabled={busy === row.id} onClick={() => handleCancel(row.id, row.deliveryNumber)}>
                                 <XCircle className="mr-2 h-3.5 w-3.5" /> Cancel
                               </DropdownMenuItem>
                             )}
                             {row.status === "draft" && (
-                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => toast({ title: "Deleted", description: `${row.deliveryNumber} deleted`, variant: "destructive" })}>
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={busy === row.id} onClick={() => setDeleteTarget({ id: row.id, number: row.deliveryNumber })}>
                                 <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                               </DropdownMenuItem>
                             )}
@@ -420,6 +485,26 @@ export function DeliveryTable({ data, onRowClick, onStatusChange }: DeliveryTabl
           </div>
         </div>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบ Delivery Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ &quot;{deleteTarget?.number}&quot; อย่างถาวรใช่หรือไม่?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && handleDelete(deleteTarget.id, deleteTarget.number)}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

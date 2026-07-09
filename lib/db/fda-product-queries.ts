@@ -142,6 +142,97 @@ export async function createFdaRegistration(
   return rows[0]
 }
 
+export async function updateFdaStatus(
+  id: string,
+  status: FdaStatus,
+  extra?: { approvalComment?: string; rejectionReason?: string }
+): Promise<boolean> {
+  const rows = await db
+    .update(fdaRegistrations)
+    .set({ status, ...extra })
+    .where(eq(fdaRegistrations.id, id))
+    .returning()
+  return rows.length > 0
+}
+
+export async function updateFdaRegistration(
+  id: string,
+  data: Partial<Omit<FdaRegistrationRow, "id" | "registrationCode" | "createdAt" | "updatedAt">>
+): Promise<boolean> {
+  const rows = await db
+    .update(fdaRegistrations)
+    .set(data)
+    .where(eq(fdaRegistrations.id, id))
+    .returning()
+  return rows.length > 0
+}
+
+export async function deleteFdaRegistration(id: string): Promise<boolean> {
+  const rows = await db.delete(fdaRegistrations).where(eq(fdaRegistrations.id, id)).returning()
+  return rows.length > 0
+}
+
+export async function cloneFdaRegistration(id: string): Promise<FdaRegistrationRow | null> {
+  const rows = await db.select().from(fdaRegistrations).where(eq(fdaRegistrations.id, id)).limit(1)
+  if (!rows[0]) return null
+  const src = rows[0]
+  const { nanoid } = await import("nanoid")
+  const newId = nanoid(12)
+  const now = new Date().toISOString().slice(0, 10)
+  const prefix = src.registrationType === "jk" ? "JK" : "JR"
+  const code = `${prefix}-${now.replace(/-/g, "")}-${newId.slice(0, 4).toUpperCase()}`
+  const inserted = await db.insert(fdaRegistrations).values({
+    ...src,
+    id: newId,
+    registrationCode: code,
+    registrationNumber: null,
+    status: "draft",
+    createdAt: now,
+    renewalCount: (src.renewalCount ?? 0) + 1,
+  }).returning()
+  return inserted[0]
+}
+
+// ─── PIF sub-table mutations ──────────────────────────────────────────────
+
+export async function addFdaIngredient(data: Omit<import("@/lib/fda-types").FdaIngredient, "id">): Promise<import("@/lib/fda-types").FdaIngredient> {
+  const { nanoid } = await import("nanoid")
+  const rows = await db.insert(fdaIngredients).values({ ...data, id: nanoid(12) }).returning()
+  return rows[0] as unknown as import("@/lib/fda-types").FdaIngredient
+}
+
+export async function updateFdaIngredient(id: string, data: Partial<FdaIngredient>): Promise<boolean> {
+  const rows = await db.update(fdaIngredients).set(data).where(eq(fdaIngredients.id, id)).returning()
+  return rows.length > 0
+}
+
+export async function deleteFdaIngredient(id: string): Promise<boolean> {
+  const rows = await db.delete(fdaIngredients).where(eq(fdaIngredients.id, id)).returning()
+  return rows.length > 0
+}
+
+export async function addFdaManufacturingStep(data: Omit<FdaManufacturingStep, "id">): Promise<FdaManufacturingStep> {
+  const { nanoid } = await import("nanoid")
+  const rows = await db.insert(fdaManufacturingSteps).values({ ...data, id: nanoid(12) }).returning()
+  return rows[0] as unknown as FdaManufacturingStep
+}
+
+export async function deleteFdaManufacturingStep(id: string): Promise<boolean> {
+  const rows = await db.delete(fdaManufacturingSteps).where(eq(fdaManufacturingSteps.id, id)).returning()
+  return rows.length > 0
+}
+
+export async function addFdaRawMaterialSpec(data: Omit<FdaRawMaterialSpec, "id">): Promise<FdaRawMaterialSpec> {
+  const { nanoid } = await import("nanoid")
+  const rows = await db.insert(fdaRawMaterialSpecs).values({ ...data, id: nanoid(12) }).returning()
+  return rows[0] as unknown as FdaRawMaterialSpec
+}
+
+export async function deleteFdaRawMaterialSpec(id: string): Promise<boolean> {
+  const rows = await db.delete(fdaRawMaterialSpecs).where(eq(fdaRawMaterialSpecs.id, id)).returning()
+  return rows.length > 0
+}
+
 // ─── FDA detail: sub-tables ───────────────────────────────────────────────
 
 export async function getFdaIngredients(registrationId: string): Promise<FdaIngredient[]> {
@@ -310,4 +401,17 @@ export async function createProduct(
 ): Promise<ProductRow> {
   const rows = await db.insert(products).values(data).returning()
   return rows[0]
+}
+
+export async function updateProduct(
+  id: string,
+  data: Partial<Omit<ProductRow, "id" | "createdAt" | "updatedAt">>
+): Promise<boolean> {
+  const rows = await db.update(products).set({ ...data, updatedAt: new Date() }).where(eq(products.id, id)).returning()
+  return rows.length > 0
+}
+
+export async function deleteProduct(id: string): Promise<boolean> {
+  const rows = await db.update(products).set({ status: "discontinued", updatedAt: new Date() }).where(eq(products.id, id)).returning()
+  return rows.length > 0
 }

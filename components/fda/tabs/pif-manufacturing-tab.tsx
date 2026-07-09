@@ -1,18 +1,37 @@
 "use client"
 
+import { useState } from "react"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
 import type { FdaManufacturingStep } from "@/lib/fda-types"
 
 interface ManufacturingTabProps {
   steps: FdaManufacturingStep[]
   isDraft: boolean
+  onRefresh?: () => void
 }
 
-export function FdaPifManufacturingTab({ steps, isDraft }: ManufacturingTabProps) {
+export function FdaPifManufacturingTab({ steps, isDraft, onRefresh }: ManufacturingTabProps) {
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const handleDelete = async (id: string) => {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/fda/manufacturing-steps/${id}`, { method: "DELETE" })
+      if (res.ok) { toast.success("ลบ step แล้ว"); onRefresh?.() }
+      else toast.error("เกิดข้อผิดพลาด")
+    } finally { setBusy(false); setDeleteTarget(null) }
+  }
+
   return (
     <div className="flex flex-col gap-3 py-3">
       <div className="flex items-center justify-between">
@@ -68,10 +87,10 @@ export function FdaPifManufacturingTab({ steps, isDraft }: ManufacturingTabProps
                   {isDraft && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <button className="rounded p-1 hover:bg-secondary text-muted-foreground" aria-label="Edit step">
+                        <button className="rounded p-1 hover:bg-secondary text-muted-foreground" aria-label="Edit step" onClick={() => toast.info("แก้ไขใน detail page")}>
                           <Pencil className="h-3 w-3" />
                         </button>
-                        <button className="rounded p-1 hover:bg-red-50 text-muted-foreground hover:text-red-500" aria-label="Delete step">
+                        <button className="rounded p-1 hover:bg-red-50 text-muted-foreground hover:text-red-500" disabled={busy} aria-label="Delete step" onClick={() => setDeleteTarget({ id: step.id, name: step.stepName })}>
                           <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
@@ -83,6 +102,18 @@ export function FdaPifManufacturingTab({ steps, isDraft }: ManufacturingTabProps
           </TableBody>
         </Table>
       </div>
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบ Manufacturing Step</AlertDialogTitle>
+            <AlertDialogDescription>ลบ &quot;{deleteTarget?.name}&quot;?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteTarget && handleDelete(deleteTarget.id)}>ลบ</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

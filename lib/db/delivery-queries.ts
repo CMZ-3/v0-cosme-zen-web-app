@@ -186,3 +186,35 @@ export async function patchDeliveryStatus(
   if (!rows[0]) return null
   return rowToDeliveryOrder(rows[0])
 }
+
+export async function deleteDeliveryOrder(id: string): Promise<boolean> {
+  const rows = await db.delete(deliveryOrders).where(eq(deliveryOrders.id, id)).returning()
+  return rows.length > 0
+}
+
+export async function cloneDeliveryOrder(id: string): Promise<DeliveryOrder | null> {
+  const rows = await db.select().from(deliveryOrders).where(eq(deliveryOrders.id, id)).limit(1)
+  if (!rows[0]) return null
+  const src = rows[0]
+  const { nanoid } = await import("nanoid")
+  const newId = nanoid(12)
+  const today = new Date().toISOString().split("T")[0]
+  const seq = String(Date.now()).slice(-6)
+  const newNumber = `DO-CLONE-${seq}`
+  const inserted = await db.insert(deliveryOrders).values({
+    ...src,
+    id: newId,
+    deliveryNumber: newNumber,
+    status: "draft" as DeliveryStatus,
+    jobStatus: null,
+    orderDate: today,
+    shippedAt: null,
+    pickedAt: null,
+    actualDeliveryDate: null,
+    trackingNumber: null,
+    receiverName: null,
+    podNotes: null,
+    updatedAt: new Date(),
+  }).returning()
+  return inserted[0] ? rowToDeliveryOrder(inserted[0]) : null
+}
