@@ -71,11 +71,6 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
     fetcher,
     { revalidateOnFocus: false },
   )
-  const { data: lotsData, mutate: mutateLots } = useSWR<{ lots: ProductLot[] }>(
-    productId ? `/api/products/${productId}/lots` : null,
-    fetcher,
-    { revalidateOnFocus: false },
-  )
   if (!productId) return null
   // Cast to Product for sub-section compatibility; DB may not fill all fields
   // so sub-sections fall back to "—" via optional chaining.
@@ -173,7 +168,7 @@ export function ProductDetailDrawer({ open, onOpenChange, productId }: ProductDe
               <TabsContent value="fda" className="mt-0 space-y-5"><FDAQASection product={product} /></TabsContent>
               <TabsContent value="specs" className="mt-0 space-y-5"><SpecsSection specs={mockSpecifications} /></TabsContent>
               <TabsContent value="attrs" className="mt-0 space-y-5"><AttributesSection attributes={mockAttributes} /></TabsContent>
-              <TabsContent value="lots" className="mt-0 space-y-5"><LotsSection lots={lotsData?.lots ?? []} productId={productId} onRefresh={() => mutateLots()} /></TabsContent>
+              <TabsContent value="lots" className="mt-0 space-y-5"><LotsSection lots={mockLots} /></TabsContent>
               <TabsContent value="docs" className="mt-0 space-y-3"><DocsSection product={product} /></TabsContent>
               <TabsContent value="history" className="mt-0"><HistorySection entries={mockAudit} /></TabsContent>
             </div>
@@ -648,58 +643,9 @@ function AttributesSection({ attributes }: { attributes: ProductAttribute[] }) {
 }
 
 /* ========= Lots Section (9-7, 9-8) ========= */
-function LotsSection({ lots, productId, onRefresh }: { lots: ProductLot[]; productId: string; onRefresh: () => void }) {
+function LotsSection({ lots }: { lots: ProductLot[] }) {
   const [expandedLot, setExpandedLot] = useState<string | null>(null)
   const [showCreateLot, setShowCreateLot] = useState(false)
-  const [lotForm, setLotForm] = useState({ fdaLotReference: "", mfgDate: "", expDate: "", quantity: "", storageLocation: "", notes: "" })
-  const [savingLot, setSavingLot] = useState(false)
-
-  async function handleQCAction(lotId: string, action: "approve" | "reject") {
-    try {
-      const res = await fetch(`/api/products/${productId}/lots`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lotId, qualityStatus: action === "approve" ? "approved" : "rejected", status: action === "approve" ? "released" : "rejected" }),
-      })
-      if (res.ok) {
-        toast.success(action === "approve" ? "Lot approved" : "Lot rejected")
-        onRefresh()
-      } else {
-        toast.error("เกิดข้อผิดพลาด")
-      }
-    } catch { toast.error("เกิดข้อผิดพลาด") }
-  }
-
-  async function handleCreateLot() {
-    if (!lotForm.fdaLotReference || !lotForm.mfgDate || !lotForm.quantity) {
-      toast.error("กรุณากรอก FDA Lot Ref, วันที่ผลิต และจำนวน")
-      return
-    }
-    setSavingLot(true)
-    try {
-      const res = await fetch(`/api/products/${productId}/lots`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fdaLotReference: lotForm.fdaLotReference,
-          mfgDate: lotForm.mfgDate,
-          expDate: lotForm.expDate || null,
-          quantity: Number(lotForm.quantity),
-          storageLocation: lotForm.storageLocation,
-          notes: lotForm.notes,
-        }),
-      })
-      if (res.ok) {
-        toast.success("สร้าง Lot แล้ว")
-        setShowCreateLot(false)
-        setLotForm({ fdaLotReference: "", mfgDate: "", expDate: "", quantity: "", storageLocation: "", notes: "" })
-        onRefresh()
-      } else {
-        toast.error("เกิดข้อผิดพลาด")
-      }
-    } finally { setSavingLot(false) }
-  }
-
   const totalProduced = lots.reduce((s, l) => s + l.quantity, 0)
   const totalInStock = lots.reduce((s, l) => s + l.inStockQty, 0)
   const avgYield = lots.filter((l) => l.yieldPercent).reduce((s, l, _, arr) => s + (l.yieldPercent || 0) / arr.length, 0)
@@ -793,7 +739,7 @@ function LotsSection({ lots, productId, onRefresh }: { lots: ProductLot[]; produ
                                 <Button
                                   size="sm"
                                   className="h-6 gap-1 rounded-lg bg-[#10b981] text-[9px] font-bold text-card hover:bg-[#059669]"
-                                  onClick={(e) => { e.stopPropagation(); handleQCAction(lot.id, "approve") }}
+                                  onClick={(e) => { e.stopPropagation(); toast.success("Quality approved") }}
                                 >
                                   <CheckCircle2 className="h-3 w-3" /> Approve
                                 </Button>
@@ -801,7 +747,7 @@ function LotsSection({ lots, productId, onRefresh }: { lots: ProductLot[]; produ
                                   size="sm"
                                   variant="outline"
                                   className="h-6 gap-1 rounded-lg text-[9px] font-bold text-[#ef4444] border-[#ef4444]/20 hover:bg-[#fef2f2]"
-                                  onClick={(e) => { e.stopPropagation(); handleQCAction(lot.id, "reject") }}
+                                  onClick={(e) => { e.stopPropagation(); toast.error("Quality rejected") }}
                                 >
                                   <XCircle className="h-3 w-3" /> Reject
                                 </Button>
@@ -882,38 +828,36 @@ function LotsSection({ lots, productId, onRefresh }: { lots: ProductLot[]; produ
           <div className="space-y-3 py-2">
             <div>
               <label className="mb-1 block text-[11px] font-bold uppercase text-muted-foreground">FDA Lot Reference <span className="text-[#ef4444]">*</span></label>
-              <Input value={lotForm.fdaLotReference} onChange={(e) => setLotForm((p) => ({ ...p, fdaLotReference: e.target.value }))} placeholder="e.g. FDA-LOT-VC15-260301" className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
+              <Input placeholder="e.g. FDA-LOT-VC15-260301" className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-[11px] font-bold uppercase text-muted-foreground">Manufacturing Date <span className="text-[#ef4444]">*</span></label>
-                <Input type="date" value={lotForm.mfgDate} onChange={(e) => setLotForm((p) => ({ ...p, mfgDate: e.target.value }))} className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
+                <Input type="date" className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-bold uppercase text-muted-foreground">Expiry Date</label>
-                <Input type="date" value={lotForm.expDate} onChange={(e) => setLotForm((p) => ({ ...p, expDate: e.target.value }))} className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
+                <Input type="date" className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-[11px] font-bold uppercase text-muted-foreground">Quantity <span className="text-[#ef4444]">*</span></label>
-                <Input type="number" value={lotForm.quantity} onChange={(e) => setLotForm((p) => ({ ...p, quantity: e.target.value }))} placeholder="10000" className="h-9 rounded-[10px] border-border bg-secondary text-right font-mono text-[13px]" />
+                <Input type="number" placeholder="10000" className="h-9 rounded-[10px] border-border bg-secondary text-right font-mono text-[13px]" />
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-bold uppercase text-muted-foreground">Storage Location</label>
-                <Input value={lotForm.storageLocation} onChange={(e) => setLotForm((p) => ({ ...p, storageLocation: e.target.value }))} placeholder="e.g. Warehouse A-1" className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
+                <Input placeholder="e.g. Warehouse A-1" className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
               </div>
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-bold uppercase text-muted-foreground">Notes</label>
-              <Input value={lotForm.notes} onChange={(e) => setLotForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Optional notes..." className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
+              <Input placeholder="Optional notes..." className="h-9 rounded-[10px] border-border bg-secondary text-[13px]" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" className="rounded-[10px] text-[11px]" onClick={() => setShowCreateLot(false)}>Cancel</Button>
-            <Button className="rounded-[10px] bg-primary text-[11px] text-primary-foreground" onClick={handleCreateLot} disabled={savingLot}>
-              {savingLot ? "Creating..." : "Create Lot"}
-            </Button>
+            <Button className="rounded-[10px] bg-primary text-[11px] text-primary-foreground" onClick={() => { toast.success("Lot created"); setShowCreateLot(false) }}>Create Lot</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

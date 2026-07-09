@@ -2,9 +2,8 @@
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Search, MoreHorizontal, Pencil, Trash2, Loader2, Check, X } from "lucide-react"
+import { Search, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -29,29 +28,6 @@ export function StockMovementsTab({ data, onRefresh }: StockMovementsTabProps) {
   const [statusFilter, setStatusFilter] = useState("all")
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; ref: string } | null>(null)
   const [busy, setBusy] = useState(false)
-  const [editTarget, setEditTarget] = useState<{ id: string; ref: string; notes: string } | null>(null)
-  const [editNotes, setEditNotes] = useState("")
-  const [savingEdit, setSavingEdit] = useState(false)
-
-  async function handleSaveMovementEdit() {
-    if (!editTarget) return
-    setSavingEdit(true)
-    try {
-      const res = await fetch(`/api/stock/movements/${editTarget.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: editNotes }),
-      })
-      if (res.ok) {
-        toast.success("อัปเดต movement แล้ว")
-        setEditTarget(null)
-        onRefresh?.()
-        router.refresh()
-      } else {
-        toast.error("เกิดข้อผิดพลาด")
-      }
-    } finally { setSavingEdit(false) }
-  }
 
   const filtered = useMemo(() => {
     return data.filter((mv) => {
@@ -193,8 +169,8 @@ export function StockMovementsTab({ data, onRefresh }: StockMovementsTabProps) {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="text-xs gap-2" onClick={() => { setEditTarget({ id: mv.id, ref: mv.referenceNumber, notes: mv.notes ?? "" }); setEditNotes(mv.notes ?? "") }}>
-                              <Pencil className="h-3 w-3" /> Edit Notes
+                            <DropdownMenuItem className="text-xs gap-2" onClick={() => toast.info(`Edit ${mv.referenceNumber} — ใช้ Create Movement Dialog เพื่อแก้ไข`)}>
+                              <Pencil className="h-3 w-3" /> Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-xs gap-2 text-destructive focus:text-destructive"
@@ -237,31 +213,6 @@ export function StockMovementsTab({ data, onRefresh }: StockMovementsTabProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {editTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm rounded-2xl bg-card p-5 shadow-xl border border-border">
-            <p className="mb-1 text-sm font-extrabold text-foreground">แก้ไข Movement</p>
-            <p className="mb-3 font-mono text-[11px] text-muted-foreground">{editTarget.ref}</p>
-            <label className="mb-1 block text-[10px] font-bold uppercase text-muted-foreground">Notes</label>
-            <Textarea
-              rows={3}
-              value={editNotes}
-              onChange={(e) => setEditNotes(e.target.value)}
-              className="text-[11px] resize-none"
-              placeholder="เพิ่มหมายเหตุ..."
-            />
-            <div className="mt-3 flex justify-end gap-2">
-              <Button variant="outline" size="sm" className="gap-1 text-[11px]" onClick={() => setEditTarget(null)}>
-                <X className="h-3 w-3" /> ยกเลิก
-              </Button>
-              <Button size="sm" className="gap-1 text-[11px]" onClick={handleSaveMovementEdit} disabled={savingEdit}>
-                {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} บันทึก
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

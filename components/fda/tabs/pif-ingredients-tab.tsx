@@ -1,10 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { AlertTriangle, FlaskConical, Plus, Pencil, Trash2, Loader2, Check, X } from "lucide-react"
+import { AlertTriangle, FlaskConical, Plus, Pencil, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -32,28 +31,6 @@ function formatPct(ing: FdaIngredient): string {
 export function FdaPifIngredientsTab({ ingredients, isDraft, registrationId, onRefresh }: IngredientsTabProps) {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [busy, setBusy] = useState(false)
-  const [editTarget, setEditTarget] = useState<FdaIngredient | null>(null)
-  const [editForm, setEditForm] = useState<Partial<FdaIngredient>>({})
-  const [saving, setSaving] = useState(false)
-
-  function startEdit(ing: FdaIngredient) {
-    setEditTarget(ing)
-    setEditForm({ ingredientName: ing.ingredientName, inciName: ing.inciName, casNumber: ing.casNumber, percentage: ing.percentage, function: ing.function, supplier: ing.supplier })
-  }
-
-  async function handleSaveEdit() {
-    if (!editTarget) return
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/fda/ingredients/${editTarget.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editForm),
-      })
-      if (res.ok) { toast.success("อัปเดตส่วนผสมแล้ว"); setEditTarget(null); onRefresh?.() }
-      else toast.error("เกิดข้อผิดพลาด")
-    } finally { setSaving(false) }
-  }
 
   const handleDelete = async (id: string) => {
     setBusy(true)
@@ -148,7 +125,7 @@ export function FdaPifIngredientsTab({ ingredients, isDraft, registrationId, onR
                   {isDraft && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <button className="rounded p-1 hover:bg-secondary text-muted-foreground" aria-label="Edit ingredient" onClick={() => startEdit(ing)}>
+                        <button className="rounded p-1 hover:bg-secondary text-muted-foreground" aria-label="Edit ingredient" onClick={() => toast.info("เปิด Edit ใน detail page")}>
                           <Pencil className="h-3 w-3" />
                         </button>
                         <button className="rounded p-1 hover:bg-red-50 text-muted-foreground hover:text-red-500" disabled={busy} aria-label="Delete ingredient" onClick={() => setDeleteTarget({ id: ing.id, name: ing.ingredientName })}>
@@ -175,43 +152,6 @@ export function FdaPifIngredientsTab({ ingredients, isDraft, registrationId, onR
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Inline edit dialog */}
-      {editTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-2xl bg-card p-5 shadow-xl border border-border">
-            <p className="mb-4 text-sm font-extrabold text-foreground">แก้ไขส่วนผสม</p>
-            <div className="grid grid-cols-2 gap-2.5">
-              {[
-                { label: "Ingredient Name *", key: "ingredientName" },
-                { label: "INCI Name", key: "inciName" },
-                { label: "CAS Number", key: "casNumber" },
-                { label: "Function", key: "function" },
-                { label: "Supplier", key: "supplier" },
-                { label: "% (fixed)", key: "percentage", type: "number" },
-              ].map(({ label, key, type }) => (
-                <div key={key}>
-                  <label className="mb-0.5 block text-[10px] font-bold uppercase text-muted-foreground">{label}</label>
-                  <Input
-                    type={type ?? "text"}
-                    value={(editForm as Record<string, unknown>)[key] as string ?? ""}
-                    onChange={(e) => setEditForm((p) => ({ ...p, [key]: type === "number" ? Number(e.target.value) : e.target.value }))}
-                    className="h-8 text-[11px]"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" size="sm" className="gap-1 text-[11px]" onClick={() => setEditTarget(null)}>
-                <X className="h-3 w-3" /> ยกเลิก
-              </Button>
-              <Button size="sm" className="gap-1 text-[11px]" onClick={handleSaveEdit} disabled={saving}>
-                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} บันทึก
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
