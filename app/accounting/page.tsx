@@ -1,36 +1,56 @@
 "use client"
 
 import Link from "next/link"
-import { mockJobOrders } from "@/lib/job-order-mock-data"
-import { DollarSign, TrendingUp, FileText, Wallet, ArrowRight, Construction } from "lucide-react"
+import useSWR from "swr"
+import { DollarSign, TrendingUp, FileText, Wallet, ArrowRight, Construction, RefreshCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 export default function AccountingPage() {
-  // Lightweight financial roll-up derived from existing job order data
-  const totalRevenue = mockJobOrders.reduce((s, jo) => s + (jo.totalValue ?? 0), 0)
-  const totalCost = mockJobOrders.reduce((s, jo) => s + (jo.costPerUnit ?? 0) * (jo.quantity ?? 0), 0)
-  const grossProfit = totalRevenue - totalCost
-  const margin = totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 100) : 0
+  const { data, isLoading, mutate } = useSWR("/api/dashboard", fetcher, { revalidateOnFocus: false })
 
-  const fmt = (n: number) => `฿${n.toLocaleString()}`
+  const kpi = data?.kpi
+  const totalRevenue: number = kpi?.totalRevenue ?? 0
+  const totalCost: number = kpi?.totalCost ?? 0
+  const grossProfit: number = kpi?.grossProfit ?? 0
+  const margin: number = kpi?.margin ?? 0
+  const openInvoices: number = kpi?.openInvoices ?? 0
+  const recentJos: Array<Record<string, unknown>> = data?.recentJos ?? []
+
+  const fmt = (n: number) =>
+    `฿${Math.round(n).toLocaleString("th-TH")}`
 
   const kpis = [
     { label: "Total Revenue", value: fmt(totalRevenue), sub: "All job orders", icon: TrendingUp, color: "#15803d", bg: "#ecfdf5" },
     { label: "Total Cost", value: fmt(totalCost), sub: "Materials + production", icon: Wallet, color: "#c2410c", bg: "#fef3c7" },
     { label: "Gross Profit", value: fmt(grossProfit), sub: `${margin}% margin`, icon: DollarSign, color: "#0369a1", bg: "#eef4ff" },
-    { label: "Open Invoices", value: String(mockJobOrders.filter((j) => j.status === "delivered").length), sub: "Awaiting payment", icon: FileText, color: "#7c3aed", bg: "#f3efff" },
+    { label: "Open Invoices", value: String(openInvoices), sub: "Awaiting payment", icon: FileText, color: "#7c3aed", bg: "#f3efff" },
   ]
 
   return (
     <div className="min-h-screen p-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
-          <DollarSign className="h-5 w-5 text-primary" />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+            <DollarSign className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl font-extrabold tracking-tight text-foreground">Accounting</h1>
+            <p className="text-[12px] text-muted-foreground">Financial overview derived from job orders</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-foreground">Accounting</h1>
-          <p className="text-[12px] text-muted-foreground">Financial overview derived from job orders</p>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 rounded-[10px] text-[12px]"
+          onClick={() => mutate()}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* KPI Row */}
@@ -40,7 +60,7 @@ export default function AccountingPage() {
           return (
             <div key={k.label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl mb-3" style={{ background: k.bg }}>
-                <Icon className="h-4.5 w-4.5" style={{ color: k.color }} />
+                <Icon className="h-4 w-4" style={{ color: k.color }} />
               </span>
               <div className="text-2xl font-extrabold text-foreground">{k.value}</div>
               <div className="text-[12px] font-semibold text-foreground mt-0.5">{k.label}</div>
@@ -60,17 +80,24 @@ export default function AccountingPage() {
             <tr className="bg-secondary/60 text-left">
               <th className="px-5 py-2.5 font-semibold text-muted-foreground">Order</th>
               <th className="px-5 py-2.5 font-semibold text-muted-foreground">Customer</th>
-              <th className="px-5 py-2.5 font-semibold text-muted-foreground text-right">Qty</th>
+              <th className="px-5 py-2.5 font-semibold text-muted-foreground text-right">Batch (kg)</th>
               <th className="px-5 py-2.5 font-semibold text-muted-foreground text-right">Value</th>
             </tr>
           </thead>
           <tbody>
-            {mockJobOrders.slice(0, 8).map((jo) => (
-              <tr key={jo.id} className="border-t border-border hover:bg-secondary/30">
-                <td className="px-5 py-3 font-mono font-bold text-primary">{jo.orderNumber}</td>
-                <td className="px-5 py-3 text-foreground">{jo.customerName}</td>
-                <td className="px-5 py-3 text-right text-muted-foreground">{jo.quantity.toLocaleString()}</td>
-                <td className="px-5 py-3 text-right font-bold text-foreground">{fmt(jo.totalValue ?? 0)}</td>
+            {recentJos.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-5 py-6 text-center text-muted-foreground text-[11px]">
+                  {isLoading ? "Loading..." : "No job orders found"}
+                </td>
+              </tr>
+            )}
+            {recentJos.map((jo) => (
+              <tr key={String(jo.id)} className="border-t border-border hover:bg-secondary/30">
+                <td className="px-5 py-3 font-mono font-bold text-primary">{String(jo.orderNumber ?? jo.id)}</td>
+                <td className="px-5 py-3 text-foreground">{String(jo.customerName ?? "—")}</td>
+                <td className="px-5 py-3 text-right text-muted-foreground">{Number(jo.batchSize ?? 0).toLocaleString()} kg</td>
+                <td className="px-5 py-3 text-right font-bold text-foreground">—</td>
               </tr>
             ))}
           </tbody>

@@ -17,7 +17,8 @@ const monthlyData = [
 
 type ViewMode = "revenue" | "orders"
 
-export function DashboardRevenueChart() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function DashboardRevenueChart({ liveData: _liveData }: { liveData?: any } = {}) {
   const [view, setView] = useState<ViewMode>("revenue")
 
   const BLUE = "#4c8bf5"

@@ -3,7 +3,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Cell, Pie, PieChart } from "recharts"
-import { mockStockDashboard, mockAlerts } from "@/lib/stock-mock-data"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { ArrowRight, AlertTriangle } from "lucide-react"
@@ -13,16 +12,25 @@ const AMBER = "#f59e0b"
 const RED = "#ef4444"
 const BLUE = "#4c8bf5"
 
-export function DashboardStockHealth() {
-  const { statusBreakdown: sb, totalInventoryValue } = mockStockDashboard
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function DashboardStockHealth({ liveData }: { liveData?: any }) {
+  const k = liveData?.kpi
+  const healthy = k?.healthy ?? 0
+  const low = k?.lowStock ?? 0
+  const outOfStock = k?.outOfStock ?? 0
+  const overStock = k?.overStock ?? 0
+  const totalInventoryValue = k?.totalInventoryValue ?? 0
+
   const donutData = [
-    { name: "Healthy", value: sb.healthy, fill: GREEN },
-    { name: "Low Stock", value: sb.low, fill: AMBER },
-    { name: "Out of Stock", value: sb.outOfStock, fill: RED },
-    { name: "Over Stock", value: sb.overStock, fill: BLUE },
+    { name: "Healthy", value: healthy, fill: GREEN },
+    { name: "Low Stock", value: low, fill: AMBER },
+    { name: "Out of Stock", value: outOfStock, fill: RED },
+    { name: "Over Stock", value: overStock, fill: BLUE },
   ]
-  const total = sb.healthy + sb.low + sb.outOfStock + sb.overStock
-  const unresolvedAlerts = mockAlerts.filter(a => !a.isResolved)
+  const total = healthy + low + outOfStock + overStock
+  const unresolvedAlerts: Array<{ id: string; itemName: string; alertType: string }> = []
+  if (low > 0) unresolvedAlerts.push({ id: "low", itemName: `${low} items`, alertType: "low_stock" })
+  if (outOfStock > 0) unresolvedAlerts.push({ id: "oos", itemName: `${outOfStock} items`, alertType: "out_of_stock" })
 
   return (
     <Card className="border border-border shadow-none">

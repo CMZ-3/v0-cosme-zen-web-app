@@ -4,9 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { Calendar, AlertTriangle } from "lucide-react"
-import { mockJobOrders } from "@/lib/job-order-mock-data"
-import { mockDeliveryOrders } from "@/lib/delivery-mock-data"
-import { mockFdaList } from "@/lib/fda-mock-data"
+
 
 interface Deadline {
   id: string
@@ -23,60 +21,16 @@ function calcDaysLeft(dateStr: string): number {
   return Math.ceil((d.getTime() - now.getTime()) / 86400000)
 }
 
-export function DashboardUpcomingDeadlines() {
-  // Collect all upcoming deadlines
-  const deadlines: Deadline[] = []
-
-  // Job order due dates
-  mockJobOrders
-    .filter(jo => jo.status !== "delivered" && jo.status !== "cancelled")
-    .forEach(jo => {
-      const dl = calcDaysLeft(jo.dueDate)
-      if (dl > -30) {
-        deadlines.push({
-          id: `jo-${jo.id}`,
-          label: jo.orderNumber,
-          detail: `${jo.brandName} - ${jo.productName}`,
-          date: jo.dueDate,
-          daysLeft: dl,
-          type: "job",
-        })
-      }
-    })
-
-  // Delivery dates
-  mockDeliveryOrders
-    .filter(d => d.status !== "delivered" && d.status !== "completed" && d.deliveryDate)
-    .forEach(d => {
-      const dl = calcDaysLeft(d.deliveryDate!)
-      if (dl > -30) {
-        deadlines.push({
-          id: `del-${d.id}`,
-          label: d.deliveryNumber,
-          detail: `${d.customerName} - ${d.productSummary || ""}`,
-          date: d.deliveryDate!,
-          daysLeft: dl,
-          type: "delivery",
-        })
-      }
-    })
-
-  // FDA expiry
-  mockFdaList
-    .filter(f => f.daysUntilExpiry !== undefined && f.daysUntilExpiry <= 90 && f.daysUntilExpiry > 0)
-    .forEach(f => {
-      deadlines.push({
-        id: `fda-${f.id}`,
-        label: f.registrationCode,
-        detail: f.productNameEn || f.productNameTh,
-        date: f.expiryDate || "",
-        daysLeft: f.daysUntilExpiry!,
-        type: "fda",
-      })
-    })
-
-  // Sort by days left ascending
-  deadlines.sort((a, b) => a.daysLeft - b.daysLeft)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function DashboardUpcomingDeadlines({ liveData }: { liveData?: any }) {
+  const deadlines: Deadline[] = (liveData?.deadlines ?? []).map((d: Record<string, unknown>) => ({
+    id: String(d.id),
+    label: String(d.label),
+    detail: String(d.detail ?? ""),
+    date: String(d.date ?? ""),
+    daysLeft: Number(d.daysLeft ?? 0),
+    type: String(d.type ?? "job") as Deadline["type"],
+  }))
 
   const typeConfig: Record<string, { label: string; color: string; bg: string }> = {
     job: { label: "JO", color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },

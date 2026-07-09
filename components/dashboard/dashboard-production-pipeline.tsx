@@ -3,7 +3,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { mockJobOrders } from "@/lib/job-order-mock-data"
 import Link from "next/link"
 import { ArrowRight, Clock, AlertTriangle, CheckCircle2 } from "lucide-react"
 
@@ -24,16 +23,20 @@ const PRIORITY_ICON: Record<string, React.ReactNode> = {
   low: <CheckCircle2 className="h-3 w-3 text-emerald-500" />,
 }
 
-export function DashboardProductionPipeline() {
-  const activeJobs = mockJobOrders.filter(jo => jo.status !== "delivered" && jo.status !== "cancelled")
-  const totalValue = mockJobOrders.reduce((s, j) => s + j.totalValue, 0)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function DashboardProductionPipeline({ liveData }: { liveData?: any }) {
+  const pipeline: Record<string, number> = liveData?.joPipeline ?? {}
+  const recentJos: Array<Record<string, unknown>> = liveData?.recentJos ?? []
+  const totalRevenue: number = liveData?.kpi?.totalRevenue ?? 0
 
   return (
     <Card className="border border-border shadow-none">
       <CardHeader className="flex-row items-center justify-between pb-3 space-y-0">
         <div>
           <CardTitle className="text-sm font-extrabold text-foreground">{"Production Pipeline"}</CardTitle>
-          <p className="text-[11px] text-muted-foreground mt-0.5">{`${activeJobs.length} active jobs | Total value ${(totalValue / 1e6).toFixed(2)}M THB`}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {`${recentJos.length} active jobs | Total value ${(totalRevenue / 1e6).toFixed(2)}M THB`}
+          </p>
         </div>
         <Link href="/job-orders" className="flex items-center gap-1 text-[11px] font-bold text-primary hover:underline">
           {"View all"}<ArrowRight className="h-3 w-3" />
@@ -43,7 +46,7 @@ export function DashboardProductionPipeline() {
         {/* Pipeline funnel visualization */}
         <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1">
           {["new", "preparing_rm", "in_production", "qc", "packing", "delivered"].map((status, i) => {
-            const count = mockJobOrders.filter(j => j.status === status).length
+            const count = pipeline[status] ?? 0
             const cfg = STATUS_CONFIG[status] || { label: status, color: "text-foreground", bg: "bg-secondary" }
             return (
               <div key={status} className="flex items-center gap-1.5">
@@ -59,46 +62,40 @@ export function DashboardProductionPipeline() {
 
         {/* Job list */}
         <div className="flex flex-col gap-2">
-          {mockJobOrders.slice(0, 4).map((jo) => {
-            const cfg = STATUS_CONFIG[jo.status] || { label: jo.status, color: "", bg: "" }
-            const fillingStep = jo.productionSteps.find(s => s.status === "active")
-            const progress = fillingStep ? Math.round((fillingStep.completedQty / fillingStep.targetQty) * 100) : 0
-            const dueDate = new Date(jo.dueDate)
-            const today = new Date()
-            const daysLeft = Math.ceil((dueDate.getTime() - today.getTime()) / 86400000)
+          {recentJos.slice(0, 4).map((jo) => {
+            const status = String(jo.status ?? "new")
+            const priority = String(jo.priority ?? "medium")
+            const cfg = STATUS_CONFIG[status] || { label: status, color: "", bg: "" }
+            const dueDate = jo.dueDate ? new Date(String(jo.dueDate)) : null
+            const daysLeft = dueDate ? Math.ceil((dueDate.getTime() - Date.now()) / 86400000) : null
 
             return (
-              <Link key={jo.id} href="/job-orders" className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors group">
+              <Link key={String(jo.id)} href="/job-orders" className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors group">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[12px] font-extrabold text-foreground">{jo.orderNumber}</span>
-                    {PRIORITY_ICON[jo.priority]}
+                    <span className="text-[12px] font-extrabold text-foreground">{String(jo.orderNumber ?? jo.id)}</span>
+                    {PRIORITY_ICON[priority]}
                     <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 font-bold border", cfg.bg, cfg.color)}>
                       {cfg.label}
                     </Badge>
                   </div>
                   <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                    {jo.brandName} - {jo.productName}
+                    {String(jo.brandName ?? "")} {jo.brandName && jo.productName ? "-" : ""} {String(jo.productName ?? "")}
                   </p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  {fillingStep && jo.status !== "delivered" && (
-                    <div className="flex flex-col items-end gap-0.5">
-                      <span className="text-[10px] font-bold text-foreground">{progress}%</span>
-                      <div className="h-1.5 w-16 rounded-full bg-secondary overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
-                      </div>
-                    </div>
-                  )}
-                  <div className="text-right">
+                {daysLeft !== null && (
+                  <div className="shrink-0 text-right">
                     <span className={cn("text-[10px] font-bold", daysLeft <= 3 ? "text-red-500" : daysLeft <= 7 ? "text-amber-600" : "text-muted-foreground")}>
-                      {daysLeft > 0 ? `${daysLeft}d left` : jo.status === "delivered" ? "Done" : "Overdue"}
+                      {daysLeft > 0 ? `${daysLeft}d left` : status === "delivered" ? "Done" : "Overdue"}
                     </span>
                   </div>
-                </div>
+                )}
               </Link>
             )
           })}
+          {recentJos.length === 0 && (
+            <p className="text-center text-[11px] text-muted-foreground py-4">No active job orders</p>
+          )}
         </div>
       </CardContent>
     </Card>

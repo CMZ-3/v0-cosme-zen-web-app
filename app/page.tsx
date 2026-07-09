@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import useSWR from "swr"
 import { DashboardKpiRow } from "@/components/dashboard/dashboard-kpi-row"
 import { DashboardRevenueChart } from "@/components/dashboard/dashboard-revenue-chart"
 import { DashboardProductionPipeline } from "@/components/dashboard/dashboard-production-pipeline"
@@ -14,8 +15,11 @@ import { DashboardV3 } from "@/components/dashboard/dashboard-v3"
 import { LayoutDashboard, Sparkles, Layers } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
 export default function DashboardPage() {
   const [tab, setTab] = useState<"v1" | "v2" | "v3">("v1")
+  const { data } = useSWR("/api/dashboard", fetcher, { refreshInterval: 60000 })
 
   return (
     <div>
@@ -79,22 +83,22 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <DashboardKpiRow />
+          <DashboardKpiRow liveData={data} />
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div className="lg:col-span-3"><DashboardRevenueChart /></div>
-            <div className="lg:col-span-2"><DashboardStockHealth /></div>
+            <div className="lg:col-span-3"><DashboardRevenueChart liveData={data} /></div>
+            <div className="lg:col-span-2"><DashboardStockHealth liveData={data} /></div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div className="lg:col-span-3"><DashboardProductionPipeline /></div>
+            <div className="lg:col-span-3"><DashboardProductionPipeline liveData={data} /></div>
             <div className="lg:col-span-2"><DashboardFdaWarnings /></div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div className="lg:col-span-3"><DashboardActivityFeed /></div>
+            <div className="lg:col-span-3"><DashboardActivityFeed liveData={data} /></div>
             <div className="lg:col-span-2 flex flex-col gap-6">
-              <DashboardUpcomingDeadlines />
+              <DashboardUpcomingDeadlines liveData={data} />
               <DashboardQuickLinks />
             </div>
           </div>

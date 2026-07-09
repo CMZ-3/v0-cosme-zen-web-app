@@ -10,11 +10,6 @@ import {
   ClipboardList,
   ArrowLeftRight,
 } from "lucide-react"
-import { mockJobOrders } from "@/lib/job-order-mock-data"
-import { mockDeliveryOrders } from "@/lib/delivery-mock-data"
-import { mockFdaList } from "@/lib/fda-mock-data"
-import { mockStockMovements } from "@/lib/stock-mock-data"
-import { mockFormulaList } from "@/lib/formula-mock-data"
 import { useMemo } from "react"
 
 
@@ -43,90 +38,35 @@ interface Activity {
   sortDate: string
 }
 
-export function DashboardActivityFeed() {
+const MODULE_ICONS: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
+  "Job Orders": { icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-50" },
+  "Delivery": { icon: Truck, color: "text-violet-600", bg: "bg-violet-50" },
+  "Stock": { icon: Package, color: "text-amber-600", bg: "bg-amber-50" },
+  "Formulas": { icon: FlaskConical, color: "text-cyan-600", bg: "bg-cyan-50" },
+  "FDA": { icon: ShieldCheck, color: "text-emerald-600", bg: "bg-emerald-50" },
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function DashboardActivityFeed({ liveData }: { liveData?: any }) {
   const activities = useMemo<Activity[]>(() => {
-    const items: Activity[] = []
+    const raw: Array<{ id: string; module: string; title: string; description: string; sortDate: string }> =
+      liveData?.recentActivity ?? []
 
-    // Job Orders
-    mockJobOrders.forEach(jo => {
-      items.push({
-        id: `jo-${jo.id}`,
-        icon: ClipboardList,
-        iconColor: "text-blue-600",
-        iconBg: "bg-blue-50",
-        title: `${jo.orderNumber} ${statusLabelMap[jo.status] || jo.status}`,
-        description: `${jo.customerName} - ${jo.productName} (${jo.quantity.toLocaleString()} pcs)`,
-        time: jo.createdAt || "",
-        module: "Job Orders",
-        sortDate: jo.createdAt || "",
-      })
+    return raw.slice(0, 8).map((item) => {
+      const cfg = MODULE_ICONS[item.module] ?? { icon: Package, color: "text-muted-foreground", bg: "bg-secondary" }
+      return {
+        id: item.id,
+        icon: cfg.icon,
+        iconColor: cfg.color,
+        iconBg: cfg.bg,
+        title: item.title,
+        description: item.description,
+        time: item.sortDate,
+        module: item.module,
+        sortDate: item.sortDate,
+      }
     })
-
-    // Delivery
-    mockDeliveryOrders.forEach(d => {
-      items.push({
-        id: `del-${d.id}`,
-        icon: Truck,
-        iconColor: "text-violet-600",
-        iconBg: "bg-violet-50",
-        title: `${d.deliveryNumber} ${statusLabelMap[d.status] || d.status}`,
-        description: `${d.customerName}${d.trackingNumber ? ` - ${d.trackingNumber}` : ""}`,
-        time: d.createdAt || "",
-        module: "Delivery",
-        sortDate: d.createdAt || "",
-      })
-    })
-
-    // FDA
-    mockFdaList.forEach(f => {
-      items.push({
-        id: `fda-${f.id}`,
-        icon: ShieldCheck,
-        iconColor: "text-emerald-600",
-        iconBg: "bg-emerald-50",
-        title: `${f.registrationCode} ${statusLabelMap[f.status] || f.status}`,
-        description: `${f.productNameTh || f.productNameEn}`,
-        time: f.submittedDate || "",
-        module: "FDA",
-        sortDate: f.submittedDate || "",
-      })
-    })
-
-    // Stock Movements
-    mockStockMovements.forEach(m => {
-      items.push({
-        id: `stk-${m.id}`,
-        icon: m.movementType === "transfer" ? ArrowLeftRight : Package,
-        iconColor: m.movementType === "buy_in" ? "text-emerald-600" : m.movementType === "use_out" ? "text-red-500" : "text-amber-600",
-        iconBg: m.movementType === "buy_in" ? "bg-emerald-50" : m.movementType === "use_out" ? "bg-red-50" : "bg-amber-50",
-        title: `${m.referenceNumber} ${statusLabelMap[m.movementType] || m.movementType}`,
-        description: `${m.itemName} ${m.quantity.toLocaleString()}`,
-        time: m.createdAt || "",
-        module: "Stock",
-        sortDate: m.createdAt || "",
-      })
-    })
-
-    // Formulas
-    mockFormulaList.slice(0, 3).forEach(f => {
-      items.push({
-        id: `fml-${f.id}`,
-        icon: FlaskConical,
-        iconColor: "text-cyan-600",
-        iconBg: "bg-cyan-50",
-        title: `${f.formulaCode} ${f.status}`,
-        description: `${f.formulaName}`,
-        time: f.updatedAt || f.createdAt || "",
-        module: "Formulas",
-        sortDate: f.updatedAt || f.createdAt || "",
-      })
-    })
-
-    // Sort by date descending, take top 8
-    return items
-      .sort((a, b) => (b.sortDate || "").localeCompare(a.sortDate || ""))
-      .slice(0, 8)
-  }, [])
+  }, [liveData])
 
   const formatTime = (dateStr: string) => {
     if (!dateStr) return ""

@@ -10,9 +10,6 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react"
-import { mockJobOrders } from "@/lib/job-order-mock-data"
-import { mockStockCards } from "@/lib/stock-mock-data"
-import { mockDeliveryOrders } from "@/lib/delivery-mock-data"
 import { useMemo } from "react"
 
 interface KpiCardProps {
@@ -48,39 +45,36 @@ function KpiCard({ label, value, sub, icon: Icon, color, bgColor, trend }: KpiCa
   )
 }
 
-export function DashboardKpiRow() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function DashboardKpiRow({ liveData }: { liveData?: any }) {
   const kpis = useMemo<KpiCardProps[]>(() => {
-    // Active Job Orders
-    const activeJo = mockJobOrders.filter(jo => !["delivered", "cancelled"].includes(jo.status))
-    const inProduction = mockJobOrders.filter(jo => ["filling", "labeling", "qc_check"].includes(jo.status)).length
+    const k = liveData?.kpi
+    const activeJo = k?.activeJo ?? 0
+    const inProduction = k?.inProduction ?? 0
+    const totalRevenue = k?.totalRevenue ?? 0
+    const joCount = liveData?.joCount ?? 0
+    const totalStock = k?.totalStock ?? 0
+    const outOfStock = k?.outOfStock ?? 0
+    const lowStock = k?.lowStock ?? 0
+    const pendingDelivery = k?.pendingDelivery ?? 0
+    const shippedCount = k?.shippedCount ?? 0
+    const pickingCount = k?.pickingCount ?? 0
 
-    // Revenue (sum all JO totalValue)
-    const totalRevenue = mockJobOrders.reduce((sum, jo) => sum + jo.totalValue, 0)
     const revFormatted = totalRevenue >= 1_000_000
       ? `${(totalRevenue / 1_000_000).toFixed(2)}M`
       : totalRevenue >= 1_000
         ? `${(totalRevenue / 1_000).toFixed(0)}K`
-        : totalRevenue.toFixed(0)
-
-    // Stock health
-    const totalStock = mockStockCards.length
-    const outOfStock = mockStockCards.filter(s => s.inventoryStatus === "out_of_stock").length
-    const lowStock = mockStockCards.filter(s => s.inventoryStatus === "low").length
-
-    // Delivery pipeline
-    const pipeline = mockDeliveryOrders.filter(d => !["delivered", "completed", "cancelled"].includes(d.status))
-    const shipped = mockDeliveryOrders.filter(d => d.status === "shipped").length
-    const picking = mockDeliveryOrders.filter(d => d.status === "picking").length
+        : String(totalRevenue.toFixed(0))
 
     return [
       {
         label: "Active Job Orders",
-        value: String(activeJo.length),
+        value: String(activeJo),
         sub: `${inProduction} in production`,
         icon: ClipboardList,
         color: "text-blue-600",
         bgColor: "bg-blue-50",
-        trend: { value: `${activeJo.length} open`, positive: activeJo.length > 0 },
+        trend: { value: `${activeJo} open`, positive: activeJo > 0 },
       },
       {
         label: "Total Revenue",
@@ -89,7 +83,7 @@ export function DashboardKpiRow() {
         icon: DollarSign,
         color: "text-emerald-600",
         bgColor: "bg-emerald-50",
-        trend: { value: `${mockJobOrders.length} orders`, positive: true },
+        trend: { value: `${joCount} orders`, positive: true },
       },
       {
         label: "Stock Items",
@@ -102,15 +96,15 @@ export function DashboardKpiRow() {
       },
       {
         label: "Delivery Pipeline",
-        value: String(pipeline.length),
-        sub: [shipped > 0 && `${shipped} shipped`, picking > 0 && `${picking} picking`].filter(Boolean).join(", ") || "None pending",
+        value: String(pendingDelivery),
+        sub: [shippedCount > 0 && `${shippedCount} shipped`, pickingCount > 0 && `${pickingCount} picking`].filter(Boolean).join(", ") || "None pending",
         icon: Truck,
         color: "text-violet-600",
         bgColor: "bg-violet-50",
-        trend: { value: `${pipeline.length} preparing`, positive: pipeline.length > 0 },
+        trend: { value: `${pendingDelivery} preparing`, positive: pendingDelivery > 0 },
       },
     ]
-  }, [])
+  }, [liveData])
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
