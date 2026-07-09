@@ -242,6 +242,18 @@ export async function cloneJobOrder(id: string): Promise<string | null> {
   return newId
 }
 
+export async function addQCResult(
+  id: string,
+  result: { id: string; parameter: string; specification: string; result: string; status: string; tester: string; testedAt: string }
+): Promise<boolean> {
+  const jo = await getJobOrder(id)
+  if (!jo) return false
+  const existing = jo.qcResults ?? []
+  const updated = [...existing, result]
+  const rows = await db.update(jobOrders).set({ qcResults: updated as never, updatedAt: new Date() }).where(eq(jobOrders.id, id)).returning()
+  return rows.length > 0
+}
+
 export async function updateJobOrder(
   id: string,
   data: Partial<{

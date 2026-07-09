@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Printer, Download, Pencil, FlaskConical, User, Package, DollarSign, Clock, Check, MoreHorizontal, Copy, Ban, PlayCircle, PauseCircle, CheckCircle2, ShieldCheck, PackageCheck, Truck } from "lucide-react"
@@ -109,6 +109,12 @@ export function JobOrderDetail({ jobOrder, onStatusChange }: Props) {
   const [tab, setTab] = useState<DetailTab>("overview")
   const [currentStatus, setCurrentStatus] = useState<JOStatus>(jobOrder.status)
   const [cloneBusy, setCloneBusy] = useState(false)
+
+  // Sync status when a different JO is selected in the list panel
+  useEffect(() => {
+    setCurrentStatus(jobOrder.status)
+  }, [jobOrder.id, jobOrder.status])
+
   const statusInfo = JO_STATUS_MAP[currentStatus]
 
   const stats = useMemo<TrackingStats>(() => computeStats(jobOrder), [jobOrder])
@@ -330,7 +336,7 @@ export function JobOrderDetail({ jobOrder, onStatusChange }: Props) {
         {tab === "overview" && <OverviewTab jobOrder={jobOrder} stats={stats} />}
         {tab === "tracking" && <DailyTrackingTab jobOrder={jobOrder} stats={stats} onRefresh={onStatusChange} />}
         {tab === "materials" && <MaterialsTab jobOrder={jobOrder} />}
-        {tab === "qc" && <QCTab jobOrder={jobOrder} />}
+        {tab === "qc" && <QCTab jobOrder={jobOrder} onRefresh={onStatusChange} />}
         {tab === "costing" && <CostingTab jobOrder={jobOrder} />}
       </div>
 
@@ -347,9 +353,13 @@ export function JobOrderDetail({ jobOrder, onStatusChange }: Props) {
 function computeStats(jo: JobOrder): TrackingStats {
   const steps = jo.productionSteps
   const allRecords = steps.flatMap((s) => s.dailyRecords)
-  const totalGood = steps.reduce((sum, s) => sum + s.goodQty, 0)
-  const totalDefect = steps.reduce((sum, s) => sum + s.defectQty, 0)
-  const totalDone = totalGood + totalDefect
+
+  // Use step-1 completedQty as the "produced" reference — summing all steps
+  // double-counts the same units flowing through each stage.
+  const firstStep = steps[0]
+  const totalGood = firstStep ? firstStep.goodQty : 0
+  const totalDefect = firstStep ? firstStep.defectQty : 0
+  const totalDone = firstStep ? firstStep.completedQty : 0
   const target = jo.quantity
   const currentStep = steps.find((s) => s.status === "active")
   const uniqueDays = new Set(allRecords.map((r) => r.date)).size

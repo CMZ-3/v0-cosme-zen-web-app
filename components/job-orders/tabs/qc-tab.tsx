@@ -4,7 +4,8 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, XCircle, Clock, AlertTriangle, ShieldCheck, ShieldX, MinusCircle } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { CheckCircle, XCircle, Clock, AlertTriangle, ShieldCheck, ShieldX, MinusCircle, Plus, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import type { JobOrder } from "@/lib/job-order-types"
 
@@ -13,11 +14,52 @@ type Disposition = "pass" | "fail" | "waived" | null
 
 interface Props {
   jobOrder: JobOrder
+  onRefresh?: () => void
 }
 
-export function QCTab({ jobOrder }: Props) {
+export function QCTab({ jobOrder, onRefresh }: Props) {
   // Track dispositions per QC result id (Leader-only action)
   const [dispositions, setDispositions] = useState<Record<string, Disposition>>({})
+
+  // Add QC result form state
+  const [showForm, setShowForm] = useState(false)
+  const [formParam, setFormParam] = useState("")
+  const [formSpec, setFormSpec] = useState("")
+  const [formResult, setFormResult] = useState("")
+  const [formStatus, setFormStatus] = useState<"pass" | "fail" | "pending">("pass")
+  const [formTester, setFormTester] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  async function handleAddResult() {
+    if (!formParam.trim() || !formResult.trim()) {
+      toast.error("กรอก Parameter และ Result ก่อน")
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/job-orders/${jobOrder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_qc_result",
+          parameter: formParam,
+          specification: formSpec,
+          result: formResult,
+          status: formStatus,
+          tester: formTester || "Admin",
+        }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      toast.success("บันทึกผล QC แล้ว", { description: `${formParam}: ${formResult} — ${formStatus.toUpperCase()}` })
+      setFormParam(""); setFormSpec(""); setFormResult(""); setFormTester("")
+      setShowForm(false)
+      onRefresh?.()
+    } catch (e) {
+      toast.error("บันทึกไม่สำเร็จ", { description: String(e) })
+    } finally {
+      setSaving(false)
+    }
+  }
 
   function getEffectiveStatus(id: string, original: string): string {
     const d = dispositions[id]
@@ -50,7 +92,8 @@ export function QCTab({ jobOrder }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-base font-extrabold text-foreground">Bulk Inspection Results</h3>
-        {results.length > 0 && (
+        <div className="flex items-center gap-2">
+          {results.length > 0 && (
           <span className={cn(
             "rounded-full px-3 py-1 text-[11px] font-bold",
             allPassed ? "bg-[#ecfdf5] text-[#15803d]" :
@@ -59,8 +102,54 @@ export function QCTab({ jobOrder }: Props) {
           )}>
             {allPassed ? "ALL PASSED" : failCount > 0 ? `${failCount} NEED DISPOSITION` : "REVIEW NEEDED"}
           </span>
-        )}
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 text-[11px]"
+            onClick={() => setShowForm(!showForm)}
+          >
+            <Plus className="h-3 w-3" /> บันทึกผล QC
+          </Button>
+        </div>
       </div>
+
+      {/* Add QC Result inline form */}
+      {showForm && (
+        <div className="rounded-xl border border-border bg-secondary/40 p-3.5">
+          <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">บันทึกผล QC ใหม่</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Input placeholder="Parameter *  เช่น pH" value={formParam} onChange={(e) => setFormParam(e.target.value)} className="h-8 text-[11px]" />
+            <Input placeholder="Specification  เช่น 5.5–6.5" value={formSpec} onChange={(e) => setFormSpec(e.target.value)} className="h-8 text-[11px]" />
+            <Input placeholder="Result *  เช่น 5.8" value={formResult} onChange={(e) => setFormResult(e.target.value)} className="h-8 text-[11px]" />
+            <Input placeholder="ผู้ทดสอบ" value={formTester} onChange={(e) => setFormTester(e.target.value)} className="h-8 text-[11px]" />
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-[11px] font-bold text-muted-foreground">สถานะ:</span>
+            {(["pass", "fail", "pending"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setFormStatus(s)}
+                className={cn(
+                  "rounded-full px-3 py-1 text-[10px] font-bold transition-all",
+                  formStatus === s
+                    ? s === "pass" ? "bg-emerald-600 text-white" : s === "fail" ? "bg-destructive text-white" : "bg-amber-500 text-white"
+                    : "border border-border bg-card text-muted-foreground hover:bg-secondary"
+                )}
+              >
+                {s.toUpperCase()}
+              </button>
+            ))}
+            <div className="ml-auto flex gap-2">
+              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => setShowForm(false)}>ยกเลิก</Button>
+              <Button size="sm" className="h-7 gap-1 text-[11px]" onClick={handleAddResult} disabled={saving}>
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />} บันทึก
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Disposition info banner -- spec 6.5 */}
       {failCount > 0 && (

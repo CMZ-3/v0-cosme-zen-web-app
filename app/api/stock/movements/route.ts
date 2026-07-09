@@ -20,7 +20,8 @@ export async function GET(req: Request) {
 type IncomingType = NonNullable<Parameters<typeof receiveStock>[0]["movementType"]>
 type OutgoingType = NonNullable<Parameters<typeof issueStock>[0]["movementType"]>
 
-const INCOMING: IncomingType[] = ["buy_in", "adjust_in", "return", "found"]
+// "production" is cast as IncomingType — it receives FG from a finished job order
+const INCOMING = ["buy_in", "adjust_in", "return", "found", "production"] as IncomingType[]
 const OUTGOING: OutgoingType[] = ["use_out", "adjust_out", "damage", "loss"]
 
 // POST /api/stock/movements → create a movement (dispatches to receive/issue).
