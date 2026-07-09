@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useState } from "react"
+import useSWR from "swr"
 import { cn } from "@/lib/utils"
 import {
   ArrowLeft, ChevronRight, Pencil, Copy, Trash2, CheckCircle, Zap, Archive, Undo2,
@@ -15,19 +16,47 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  mockFormulaList, mockFormulaIngredients, mockFormulaPhases, mockFormulaSteps,
+  mockFormulaPhases, mockFormulaSteps,
   mockFormulaQcSpecs, mockFormulaVersions, mockFormulaCostHistory, mockFormulaDocuments,
   mockTrialBatches, mockApprovalSteps, mockStabilityTests,
 } from "@/lib/formula-mock-data"
+import type { Formula, FormulaIngredient } from "@/lib/formula-types"
 import { formulaStatusLabel, formulaStatusColor, formulaTypeLabel, phaseBadgeColor } from "@/lib/formula-types"
+import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+interface FormulaDetailResponse {
+  formula: Formula
+  ingredients: FormulaIngredient[]
+}
 
 export default function FormulaDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const formula = mockFormulaList.find((f) => f.id === params.id)
+  const id = params.id as string
+  const { data, error, isLoading } = useSWR<FormulaDetailResponse>(
+    id ? `/api/formulas/${id}` : null,
+    fetcher,
+  )
+  const formula = data?.formula
+  const ingredients = data?.ingredients ?? []
 
-  if (!formula) {
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full p-6 gap-4">
+        <Skeleton className="h-16 rounded-xl" />
+        <Skeleton className="h-10 w-96 rounded-xl" />
+        <div className="grid grid-cols-2 gap-5">
+          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-64 rounded-xl" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !formula) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center">
@@ -144,7 +173,7 @@ export default function FormulaDetailPage() {
 
           {/* ===== INGREDIENTS ===== */}
           <TabsContent value="ingredients" className="m-0 p-6">
-            <IngredientsTab isDraft={isDraft} />
+            <IngredientsTab isDraft={isDraft} data={ingredients} />
           </TabsContent>
 
           {/* ===== PHASES & STEPS ===== */}
@@ -195,8 +224,6 @@ export default function FormulaDetailPage() {
 /* ============================================================================
    OVERVIEW TAB
    ============================================================================ */
-import type { Formula } from "@/lib/formula-types"
-
 function OverviewTab({ formula }: { formula: Formula }) {
   const InfoItem = ({ label, value }: { label: string; value?: string | number | null }) => (
     <div>
@@ -284,10 +311,10 @@ function OverviewTab({ formula }: { formula: Formula }) {
 /* ============================================================================
    INGREDIENTS TAB
    ============================================================================ */
-function IngredientsTab({ isDraft }: { isDraft: boolean }) {
-  const data = mockFormulaIngredients
+function IngredientsTab({ isDraft, data }: { isDraft: boolean; data: FormulaIngredient[] }) {
   const totalPct = data.reduce((s, i) => s + i.percentage, 0)
   const isBalanced = Math.abs(totalPct - 100) < 0.01
+  const linkedCount = data.filter((i) => i.stockCardId).length
 
   return (
     <div className="space-y-4">
@@ -298,6 +325,12 @@ function IngredientsTab({ isDraft }: { isDraft: boolean }) {
             Total: {totalPct.toFixed(2)}%
             {!isBalanced && " (should be ~100%)"}
           </div>
+          {data.length > 0 && (
+            <div className={cn("flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full", linkedCount === data.length ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground")}>
+              <Package className="h-3 w-3" />
+              {linkedCount}/{data.length} linked to stock
+            </div>
+          )}
         </div>
         {isDraft && (
           <div className="flex gap-2">
@@ -314,37 +347,61 @@ function IngredientsTab({ isDraft }: { isDraft: boolean }) {
               <TableHead className="w-10 text-[10px] text-center">#</TableHead>
               <TableHead className="text-[10px]">Ingredient</TableHead>
               <TableHead className="text-[10px]">INCI Name</TableHead>
+              <TableHead className="w-32 text-[10px]">Stock Item</TableHead>
               <TableHead className="w-16 text-[10px] text-center">Phase</TableHead>
               <TableHead className="w-20 text-[10px] text-right">%</TableHead>
-              <TableHead className="text-[10px]">Function</TableHead>
               <TableHead className="w-24 text-[10px] text-right">Unit Cost</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((ing) => (
-              <TableRow key={ing.id} className="group hover:bg-muted/20">
-                <TableCell className="text-[11px] text-center text-muted-foreground">{ing.sortOrder}</TableCell>
-                <TableCell className="text-[12px] font-semibold">{ing.ingredientName}</TableCell>
-                <TableCell className="text-[11px] text-muted-foreground italic">{ing.inciName ?? "--"}</TableCell>
-                <TableCell className="text-center">
-                  {ing.phase && (
-                    <span className={cn("inline-flex items-center justify-center h-5 w-5 rounded-md text-[10px] font-bold", phaseBadgeColor[ing.phase] ?? "bg-secondary text-foreground")}>
-                      {ing.phase}
-                    </span>
-                  )}
+            {data.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground text-sm">
+                  No ingredients recorded for this formula
                 </TableCell>
-                <TableCell className="text-right text-[12px] font-medium">{ing.percentage.toFixed(2)}</TableCell>
-                <TableCell className="text-[11px] text-muted-foreground">{ing.function ?? "--"}</TableCell>
-                <TableCell className="text-right text-[11px]">{ing.unitCost != null ? `\u0e3f${ing.unitCost.toLocaleString()}` : "--"}</TableCell>
               </TableRow>
-            ))}
+            ) : (
+              data.map((ing) => (
+                <TableRow key={ing.id} className="group hover:bg-muted/20">
+                  <TableCell className="text-[11px] text-center text-muted-foreground">{ing.sortOrder}</TableCell>
+                  <TableCell className="text-[12px] font-semibold">{ing.ingredientName}</TableCell>
+                  <TableCell className="text-[11px] text-muted-foreground italic">{ing.inciName ?? "--"}</TableCell>
+                  <TableCell>
+                    {ing.stockCardId ? (
+                      <Link
+                        href={`/stock/${ing.stockCardId}`}
+                        className="inline-flex items-center gap-1 text-[11px] font-mono font-medium text-primary hover:underline"
+                      >
+                        <Package className="h-3 w-3" />
+                        {ing.itemCode ?? ing.stockCardId}
+                      </Link>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600">
+                        <AlertTriangle className="h-3 w-3" /> Unlinked
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {ing.phase && (
+                      <span className={cn("inline-flex items-center justify-center h-5 w-5 rounded-md text-[10px] font-bold", phaseBadgeColor[ing.phase] ?? "bg-secondary text-foreground")}>
+                        {ing.phase}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right text-[12px] font-medium">{ing.percentage.toFixed(2)}</TableCell>
+                  <TableCell className="text-right text-[11px]">{ing.unitCost != null ? `\u0e3f${ing.unitCost.toLocaleString()}` : "--"}</TableCell>
+                </TableRow>
+              ))
+            )}
             {/* Total row */}
-            <TableRow className="bg-muted/40 font-bold border-t-2">
-              <TableCell />
-              <TableCell colSpan={3} className="text-[12px]">Total</TableCell>
-              <TableCell className="text-right text-[12px]">{totalPct.toFixed(2)}%</TableCell>
-              <TableCell colSpan={2} />
-            </TableRow>
+            {data.length > 0 && (
+              <TableRow className="bg-muted/40 font-bold border-t-2">
+                <TableCell />
+                <TableCell colSpan={4} className="text-[12px]">Total</TableCell>
+                <TableCell className="text-right text-[12px]">{totalPct.toFixed(2)}%</TableCell>
+                <TableCell />
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>

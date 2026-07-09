@@ -3,7 +3,7 @@
  * the `Formula` and `FormulaIngredient` types used by the existing UI components.
  */
 import { db } from "@/lib/db"
-import { formulas, formulaIngredients } from "@/lib/db/schema"
+import { formulas, formulaIngredients, stockCards } from "@/lib/db/schema"
 import { sql, eq, count } from "drizzle-orm"
 import type { Formula, FormulaIngredient, FormulaKPISummary } from "@/lib/formula-types"
 
@@ -101,14 +101,31 @@ export async function getFormulaById(id: string): Promise<Formula | null> {
   return rowToFormula({ ...rows[0], ingredientCount: Number(cnt[0]?.cnt ?? 0) })
 }
 
-/** Fetch ingredients for a formula, ordered by sortOrder. */
+/**
+ * Fetch ingredients for a formula, ordered by sortOrder.
+ * LEFT JOINs the linked stock card (via stockCardId, resolved by auto-match)
+ * to enrich each ingredient with INCI name, item code, and unit cost pulled
+ * from the live stock catalog.
+ */
 export async function getFormulaIngredients(formulaId: string): Promise<FormulaIngredient[]> {
   const rows = await db
-    .select()
+    .select({
+      ing: formulaIngredients,
+      stockItemCode: stockCards.itemCode,
+      stockInci: stockCards.inciName,
+      stockUnitCost: stockCards.unitCost,
+    })
     .from(formulaIngredients)
+    .leftJoin(stockCards, eq(formulaIngredients.stockCardId, stockCards.id))
     .where(eq(formulaIngredients.formulaId, formulaId))
     .orderBy(formulaIngredients.sortOrder)
-  return rows.map(rowToIngredient)
+
+  return rows.map(({ ing, stockItemCode, stockInci, stockUnitCost }) => ({
+    ...rowToIngredient(ing),
+    itemCode: stockItemCode ?? null,
+    inciName: stockInci ?? null,
+    unitCost: stockUnitCost ?? null,
+  }))
 }
 
 /** Insert a new formula + ingredients. Returns the created Formula. */
