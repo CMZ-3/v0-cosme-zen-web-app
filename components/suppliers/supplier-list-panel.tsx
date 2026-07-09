@@ -2,16 +2,20 @@
 
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
-import { Search, Plus, MoreHorizontal, Pencil, Star, Archive, Eye } from "lucide-react"
+import { Search, Plus, MoreHorizontal, Pencil, Archive, Eye, Trash2 } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useToast } from "@/hooks/use-toast"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import type { SupplierListItem, SupplierStatus } from "@/lib/supplier-types"
+import type { SupplierListItem } from "@/lib/supplier-types"
 import { SUPPLIER_TYPE_MAP, GRADE_MAP } from "@/lib/supplier-types"
 
 type FilterTab = "active" | "pending" | "issue"
@@ -21,12 +25,15 @@ interface SupplierListPanelProps {
   selectedId: string | null
   onSelect: (id: string) => void
   onNewClick: () => void
+  onEditRequest: (id: string) => void
+  onArchive: (id: string, name: string) => void
+  onDelete: (id: string, name: string) => void
 }
 
-export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick }: SupplierListPanelProps) {
-  const { toast } = useToast()
+export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick, onEditRequest, onArchive, onDelete }: SupplierListPanelProps) {
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("active")
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
 
   const counts = useMemo(() => ({
     active: suppliers.filter(s => s.status === "active").length,
@@ -143,14 +150,15 @@ export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick 
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(sup.id) }}>
                         <Eye className="mr-2 h-3.5 w-3.5" /> View Detail
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast({ title: "Edit Supplier", description: sup.supplierName }) }}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditRequest(sup.id) }}>
                         <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast({ title: "Rate Supplier", description: `Rating ${sup.supplierName}` }) }}>
-                        <Star className="mr-2 h-3.5 w-3.5" /> Rate Supplier
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-amber-600 focus:text-amber-600" onClick={(e) => { e.stopPropagation(); toast({ title: "Archived", description: `${sup.supplierName} archived` }) }}>
+                      <DropdownMenuItem className="text-amber-600 focus:text-amber-600" onClick={(e) => { e.stopPropagation(); onArchive(sup.id, sup.supplierName) }}>
                         <Archive className="mr-2 h-3.5 w-3.5" /> Archive
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: sup.id, name: sup.supplierName }) }}>
+                        <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -185,6 +193,29 @@ export function SupplierListPanel({ suppliers, selectedId, onSelect, onNewClick 
           )
         })}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบซัพพลายเออร์</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ &quot;{deleteTarget?.name}&quot; อย่างถาวรใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) onDelete(deleteTarget.id, deleteTarget.name)
+                setDeleteTarget(null)
+              }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -8,16 +8,24 @@ import {
   MapPin, Phone, Mail, Globe, FileText, Shield, Package, ShoppingCart,
   BarChart3, FolderOpen, ChevronRight, Download, ExternalLink, Clock,
   User, Building, Star, CheckCircle, AlertTriangle, XCircle, Plus,
-  ShieldCheck, ShieldAlert, BadgeCheck, CalendarDays, Award
+  ShieldCheck, ShieldAlert, BadgeCheck, CalendarDays, Award, Trash2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
+import { exportSupplierToPdf } from "@/lib/export-pdf"
 
 type TabKey = "products" | "overview" | "catalog" | "coa" | "orders" | "performance" | "documents" | "certificates"
 
 interface SupplierDetailPanelProps {
   detail: SupplierDetail | null
   supplierName?: string
+  onEdit?: () => void
+  onApprove?: (id: string, isApproved: boolean) => void
+  onDelete?: (id: string, name: string) => void
 }
 
 // --- Score Ring SVG ---
@@ -64,9 +72,10 @@ function TradeCard({ paymentTerms, leadTime, moq, ytdOrder }: { paymentTerms?: s
   )
 }
 
-export function SupplierDetailPanel({ detail, supplierName }: SupplierDetailPanelProps) {
+export function SupplierDetailPanel({ detail, supplierName, onEdit, onApprove, onDelete }: SupplierDetailPanelProps) {
   const [tab, setTab] = useState<TabKey>("overview")
-  const [isApproved, setIsApproved] = useState(detail?.isApproved ?? false)
+  const [showDelete, setShowDelete] = useState(false)
+  const isApproved = detail?.isApproved ?? false
 
   if (!detail) {
     return (
@@ -159,18 +168,21 @@ export function SupplierDetailPanel({ detail, supplierName }: SupplierDetailPane
                   size="sm"
                   className="h-8 rounded-lg text-[11px] gap-1.5 w-full justify-start bg-[#15803d] hover:bg-[#166534] text-white"
                   onClick={() => {
-                    setIsApproved(true)
+                    onApprove?.(detail.id, true)
                     toast.success(`${detail.supplierName} approved`, { description: "Supplier can now be used as a stock source." })
                   }}
                 >
                   <ShieldCheck className="h-3 w-3" /> Approve Supplier
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5 w-full justify-start" onClick={() => toast.info(`Editing ${detail.supplierName}`)}>
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5 w-full justify-start" onClick={() => onEdit?.()}>
                 <Building className="h-3 w-3" /> Edit
               </Button>
-              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5 w-full justify-start" onClick={() => toast.success(`Exporting ${detail.supplierCode} to PDF...`)}>
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5 w-full justify-start" onClick={() => { exportSupplierToPdf(detail); toast.success(`กำลังส่งออก ${detail.supplierCode} เป็น PDF`) }}>
                 <Download className="h-3 w-3" /> Export
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[11px] gap-1.5 w-full justify-start text-destructive hover:text-destructive" onClick={() => setShowDelete(true)}>
+                <Trash2 className="h-3 w-3" /> Delete
               </Button>
             </div>
             <ScoreRing value={avgRating} max={5} color="#10b981" label="Rating" />
@@ -219,6 +231,26 @@ export function SupplierDetailPanel({ detail, supplierName }: SupplierDetailPane
         {tab === "performance" && <PlaceholderTab label="Performance" />}
         {tab === "documents" && <DocumentsTab detail={detail} />}
       </div>
+
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบซัพพลายเออร์</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ &quot;{detail.supplierName}&quot; อย่างถาวรใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { onDelete?.(detail.id, detail.supplierName); setShowDelete(false) }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
