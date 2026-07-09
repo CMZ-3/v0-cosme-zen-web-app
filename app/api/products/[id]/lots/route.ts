@@ -7,11 +7,20 @@ export const dynamic = "force-dynamic"
 
 interface ProductLotRow {
   id: string
+  productId: string
   lotNumber: string
+  fdaLotReference?: string
   mfgDate: string
   expDate: string
   quantity: number
   qcResult: string
+  qcData: Record<string, unknown>
+  qualityStatus: string
+  storageLocation?: string
+  reservedQuantity: number
+  inStockQty: number
+  deliveredQty: number
+  costPerUnit: number
   status: string
   notes?: string
   [key: string]: unknown
@@ -36,7 +45,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params
   try {
     const lots = await getLots(id)
-    return NextResponse.json(lots)
+    return NextResponse.json({ lots })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
@@ -46,15 +55,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params
   try {
     const body = await req.json()
-    const { nanoid } = await import("nanoid")
     const lots = await getLots(id)
     const newLot: ProductLotRow = {
-      id: nanoid(10),
-      lotNumber: body.lotNumber ?? `LOT-${Date.now()}`,
+      id: `lot-${crypto.randomUUID().slice(0, 8)}`,
+      productId: id,
+      lotNumber: body.fdaLotReference ?? body.lotNumber ?? `LOT-${Date.now()}`,
+      fdaLotReference: body.fdaLotReference ?? "",
       mfgDate: body.mfgDate ?? new Date().toISOString().slice(0, 10),
       expDate: body.expDate ?? "",
       quantity: Number(body.quantity ?? 0),
-      qcResult: body.qcResult ?? "pending",
+      qcResult: "pending",
+      qcData: {},
+      qualityStatus: "pending",
+      storageLocation: body.storageLocation ?? "",
+      reservedQuantity: 0,
+      inStockQty: Number(body.quantity ?? 0),
+      deliveredQty: 0,
+      costPerUnit: 0,
       status: "active",
       notes: body.notes ?? "",
     }
