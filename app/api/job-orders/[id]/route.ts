@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server"
-import { getJobOrder, updateJobOrderStatus, deleteJobOrder, cloneJobOrder, updateJobOrder, addQCResult } from "@/lib/db/job-order-queries"
+import { getJobOrder, updateJobOrderStatus, deleteJobOrder, cloneJobOrder, updateJobOrder, addQCResult, buildMaterials } from "@/lib/db/job-order-queries"
+import { issueStock } from "@/lib/db/stock-mutations"
+import { db } from "@/lib/db"
+import { jobOrders } from "@/lib/db/schema"
+import { eq } from "drizzle-orm"
 import type { JOStatus } from "@/lib/job-order-types"
 
 export const dynamic = "force-dynamic"
@@ -54,8 +58,35 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // Default: status change
     const { status } = body
     if (!status) return NextResponse.json({ error: "status required" }, { status: 400 })
+
+    // When JO moves to production, auto-issue raw materials from stock
+    const stockIssues: { item: string; qty: number; ok: boolean; error?: string }[] = []
+    if (status === "in_production" || status === "in_progress") {
+      const [joRow] = await db.select().from(jobOrders).where(eq(jobOrders.id, id)).limit(1)
+      if (joRow?.formulaId) {
+        const materials = await buildMaterials(joRow.formulaId, joRow.batchSizeKg)
+        for (const mat of materials) {
+          const scId = mat.stockCardId
+          if (!scId || mat.requiredQty <= 0) continue
+          try {
+            await issueStock({
+              stockCardId: scId,
+              quantity: mat.requiredQty,
+              movementType: "use_out",
+              notes: `JO ${joRow.jobNo} — production issue`,
+              createdBy: "system",
+            })
+            stockIssues.push({ item: mat.name, qty: mat.requiredQty, ok: true })
+          } catch (err) {
+            // Insufficient stock is not fatal — record and continue
+            stockIssues.push({ item: mat.name, qty: mat.requiredQty, ok: false, error: String(err) })
+          }
+        }
+      }
+    }
+
     await updateJobOrderStatus(id, status as JOStatus)
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true, stockIssues })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

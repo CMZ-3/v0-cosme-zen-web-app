@@ -45,6 +45,16 @@ export function rowToJobOrder(
   const priority: Priority =
     rawPriority === "high" ? "high" : rawPriority === "low" ? "low" : "medium"
 
+  // Compute raw material cost from materials list (live stock card unit costs)
+  const rawMaterialCost = materials.reduce((sum, m) => sum + ((m as { lineCost?: number }).lineCost ?? 0), 0)
+  const savedBreakdown = safeObj(row.costBreakdown) as Record<string, number>
+  const packagingCost = savedBreakdown.packaging ?? 0
+  const laborCost = savedBreakdown.labor ?? 0
+  const qcOverheadCost = savedBreakdown.qcOverhead ?? 0
+  const totalCost = rawMaterialCost + packagingCost + laborCost + qcOverheadCost
+  const plannedQty = row.plannedQty ?? Math.round(row.batchSizeKg)
+  const computedCostPerUnit = plannedQty > 0 ? Math.round((totalCost / plannedQty) * 100) / 100 : 0
+
   return {
     id: row.id,
     orderNumber: row.jobNo,
@@ -63,7 +73,7 @@ export function rowToJobOrder(
     status,
     priority,
     totalValue: 0,
-    costPerUnit: 0,
+    costPerUnit: computedCostPerUnit,
     sellingPricePerUnit: 0,
     paymentTerms: "30 days",
     dueDate: row.plannedEnd ?? new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
@@ -72,10 +82,13 @@ export function rowToJobOrder(
     batches: safeArr(row.batches),
     materials,
     qcResults: safeArr(row.qcResults),
-    costBreakdown: Object.assign(
-      { rawMaterial: 0, packaging: 0, labor: 0, qcOverhead: 0, total: 0 },
-      safeObj(row.costBreakdown),
-    ),
+    costBreakdown: {
+      rawMaterial: Math.round(rawMaterialCost * 100) / 100,
+      packaging: packagingCost,
+      labor: laborCost,
+      qcOverhead: qcOverheadCost,
+      total: Math.round(totalCost * 100) / 100,
+    },
     yieldAnalysis: {
       totalInput: row.batchSizeKg,
       totalOutput: row.batchSizeKg,
@@ -128,13 +141,18 @@ export async function buildMaterials(
     const status: MaterialCheck["status"] =
       available >= requiredKg ? "sufficient" : stockQty > 0 ? "ordered" : "shortage"
 
+    const unitCost = card?.unitCost ?? 0
+
     return {
       id: ing.id,
+      stockCardId: ing.stockCardId ?? undefined,
       name: ing.rawMaterialName,
       requiredQty: Math.round(requiredKg * 100) / 100,
       requiredUnit: ing.unit,
       lot: card?.defaultLot ?? `LOT-${ing.id.slice(-6).toUpperCase()}`,
       stockQty,
+      unitCost,
+      lineCost: Math.round(requiredKg * unitCost * 100) / 100,
       status,
       reservedQty: card ? (card.balance - (card.available ?? card.balance)) : 0,
     }
