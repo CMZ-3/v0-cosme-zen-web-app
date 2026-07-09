@@ -1,5 +1,6 @@
 import { utils, writeFileXLSX, read } from "xlsx"
-import type { StockCard } from "@/lib/stock-types"
+import type { StockCard, StockMovement } from "@/lib/stock-types"
+import { movementTypeLabels } from "@/lib/stock-types"
 import type { ImportStockRow } from "@/lib/db/stock-mutations"
 
 // ------------------------------------------------------------
@@ -75,6 +76,35 @@ export function exportStockToExcel(cards: StockCard[], filename?: string) {
   const wb = utils.book_new()
   utils.book_append_sheet(wb, ws, "StockCards")
   writeFileXLSX(wb, filename ?? `stock-export-${stamp()}.xlsx`)
+}
+
+// ------------------------------------------------------------
+// Excel EXPORT — stock movements ledger.
+// ------------------------------------------------------------
+export function exportMovementsToExcel(movements: StockMovement[], filename?: string) {
+  const rows = movements.map((m) => ({
+    reference: m.referenceNumber,
+    date: new Date(m.createdAt).toLocaleString("en-GB"),
+    type: movementTypeLabels[m.movementType] ?? m.movementType,
+    item_code: m.itemCode,
+    item_name: m.itemName,
+    quantity: m.quantity,
+    unit_cost: m.unitCost ?? "",
+    total_cost: m.totalCost ?? "",
+    status: m.status,
+    lot_number: m.lotNumber ?? "",
+    created_by: m.createdBy,
+    notes: m.notes ?? "",
+  }))
+  const headers = [
+    "reference", "date", "type", "item_code", "item_name", "quantity",
+    "unit_cost", "total_cost", "status", "lot_number", "created_by", "notes",
+  ]
+  const ws = utils.json_to_sheet(rows, { header: headers })
+  ws["!cols"] = headers.map((h) => ({ wch: h === "item_name" ? 30 : h === "date" ? 20 : 14 }))
+  const wb = utils.book_new()
+  utils.book_append_sheet(wb, ws, "Movements")
+  writeFileXLSX(wb, filename ?? `stock-movements-${stamp()}.xlsx`)
 }
 
 /** Download a blank template with just the importable headers + one example row. */

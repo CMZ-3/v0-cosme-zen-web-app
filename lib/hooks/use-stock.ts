@@ -54,3 +54,21 @@ export function useStockMovements() {
   )
   return { movements: data?.movements ?? [], error, isLoading, mutate }
 }
+
+/** Live stock lots across all cards (for expiry / FEFO views). */
+export function useStockLots() {
+  const { data, error, isLoading, mutate } = useSWR<{ lots: StockLot[] }>(
+    "/api/stock/lots",
+    fetcher,
+  )
+  return { lots: data?.lots ?? [], error, isLoading, mutate }
+}
+
+/** Live stock reservations across all cards. */
+export function useStockReservations() {
+  const { data, error, isLoading, mutate } = useSWR<{ reservations: StockReservation[] }>(
+    "/api/stock/reservations",
+    fetcher,
+  )
+  return { reservations: data?.reservations ?? [], error, isLoading, mutate }
+}

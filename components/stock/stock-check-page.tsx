@@ -1,17 +1,14 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ClipboardCheck, Plus, Trash2, Play, RotateCcw, PackageCheck, AlertTriangle, TriangleAlert } from "lucide-react"
+import { ClipboardCheck, Plus, Trash2, Play, RotateCcw, PackageCheck, AlertTriangle, TriangleAlert, Loader2 } from "lucide-react"
 import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { mockStockCards } from "@/lib/stock-mock-data"
-import { mockFormulaList, mockFormulaIngredients } from "@/lib/formula-mock-data"
 import type { Formula } from "@/lib/formula-types"
 import {
-  runStockCheck,
   checkStatusLabel,
   checkStatusColor,
   type CheckJobInput,
@@ -28,16 +25,11 @@ function newJob(defaultId = ""): CheckJobInput {
 export function StockCheckPage() {
   const [jobs, setJobs] = useState<CheckJobInput[]>([newJob()])
   const [session, setSession] = useState<CheckSession | null>(null)
+  const [running, setRunning] = useState(false)
 
   // Load DB formulas for the dropdown.
   const { data: formulasData } = useSWR("/api/formulas", fetcher, { revalidateOnFocus: false })
-  const dbFormulas: Formula[] = useMemo(() => formulasData?.formulas ?? [], [formulasData])
-
-  // Merge DB formulas with mock list as fallback.
-  const allFormulas = useMemo(
-    () => (dbFormulas.length > 0 ? dbFormulas : mockFormulaList),
-    [dbFormulas],
-  )
+  const allFormulas: Formula[] = useMemo(() => formulasData?.formulas ?? [], [formulasData])
   const formulaOptions = allFormulas
 
   function addJob() {
@@ -50,22 +42,36 @@ export function StockCheckPage() {
     setJobs((j) => j.map((x) => (x.id === id ? { ...x, ...patch } : x)))
   }
 
-  function run() {
+  async function run() {
     const valid = jobs.filter((j) => j.formulaId && j.batchQty > 0)
     if (valid.length === 0) {
       toast.error("Add at least one job with a formula and batch quantity")
       return
     }
-    const result = runStockCheck(valid, allFormulas, mockFormulaIngredients, mockStockCards)
-    setSession(result)
-    if (result.totalItems === 0) {
-      toast.warning("No tracked raw materials matched these formulas")
-    } else if (result.shortageItems > 0) {
-      toast.error(`${result.shortageItems} material(s) short — review the results below`)
-    } else if (result.partialItems > 0) {
-      toast.warning(`${result.partialItems} material(s) only partially available`)
-    } else {
-      toast.success("All materials sufficient for the planned batches")
+    setRunning(true)
+    try {
+      const res = await fetch("/api/stock/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobs: valid }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Failed to run stock check")
+      const result: CheckSession = data.session
+      setSession(result)
+      if (result.totalItems === 0) {
+        toast.warning("No tracked raw materials matched these formulas")
+      } else if (result.shortageItems > 0) {
+        toast.error(`${result.shortageItems} material(s) short — review the results below`)
+      } else if (result.partialItems > 0) {
+        toast.warning(`${result.partialItems} material(s) only partially available`)
+      } else {
+        toast.success("All materials sufficient for the planned batches")
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to run stock check")
+    } finally {
+      setRunning(false)
     }
   }
 
@@ -97,8 +103,10 @@ export function StockCheckPage() {
             size="sm"
             className="h-9 gap-1.5 rounded-xl bg-indigo-600 text-[12px] text-white hover:bg-indigo-700"
             onClick={run}
+            disabled={running}
           >
-            <Play className="h-3.5 w-3.5" /> Run Check
+            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+            {running ? "Running..." : "Run Check"}
           </Button>
         </div>
       </div>
