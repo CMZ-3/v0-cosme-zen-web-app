@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { AlertTriangle, FlaskConical, Plus, Pencil, Trash2, Loader2, Check, X } from "lucide-react"
+import { FlaskConical, Plus, Pencil, Trash2, Loader2, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { IngredientScreenBadge } from "@/components/fda/ingredient-screen-badge"
+import { ComplianceBanner } from "@/components/fda/compliance-banner"
 import { Input } from "@/components/ui/input"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -132,6 +133,9 @@ export function FdaPifIngredientsTab({ ingredients, isDraft, registrationId, onR
         )}
       </div>
 
+      {/* MoPH compliance screening summary */}
+      <ComplianceBanner ingredients={ingredients} />
+
       {/* Table */}
       <div className="rounded-lg border border-border overflow-hidden">
         <Table>
@@ -161,12 +165,11 @@ export function FdaPifIngredientsTab({ ingredients, isDraft, registrationId, onR
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-medium text-foreground">{ing.ingredientName}</span>
-                      {ing.isRestricted && (
-                        <Badge variant="outline" className="h-4 gap-0.5 px-1 text-[9px] border-amber-300 text-amber-600">
-                          <AlertTriangle className="h-2.5 w-2.5" />
-                          Restricted
-                        </Badge>
-                      )}
+                      <IngredientScreenBadge
+                        name={ing.ingredientName}
+                        inciName={ing.inciName}
+                        percentage={ing.percentage}
+                      />
                     </div>
                     {ing.thaiName && <p className="text-[10px] text-muted-foreground">{ing.thaiName}</p>}
                   </TableCell>

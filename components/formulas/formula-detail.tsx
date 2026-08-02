@@ -19,6 +19,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
+import { IngredientScreenBadge } from "@/components/fda/ingredient-screen-badge"
+import { ComplianceBanner } from "@/components/fda/compliance-banner"
 import { toast } from "sonner"
 import type {
   Formula, FormulaIngredient, FormulaPhase, FormulaProcessingStep,
@@ -469,6 +471,8 @@ function IngredientsTab({
         </div>
       )}
 
+      <ComplianceBanner ingredients={data} className="mb-3" />
+
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
@@ -493,7 +497,14 @@ function IngredientsTab({
                 <TableRow key={ing.id} className="group hover:bg-muted/20">
                   <TableCell className="text-[10px] text-center text-muted-foreground">{ing.sortOrder}</TableCell>
                   <TableCell>
-                    <p className="text-[11px] font-semibold">{ing.ingredientName}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[11px] font-semibold">{ing.ingredientName}</p>
+                      <IngredientScreenBadge
+                        name={ing.ingredientName}
+                        inciName={ing.inciName}
+                        percentage={ing.percentage}
+                      />
+                    </div>
                     {ing.inciName && <p className="text-[10px] text-muted-foreground italic">{ing.inciName}</p>}
                   </TableCell>
                   <TableCell>
